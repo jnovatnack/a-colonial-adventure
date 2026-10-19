@@ -26,9 +26,12 @@ Then open <http://localhost:8000>.
 
 - **The homestead:** farmhouse, barn, coop, well, kitchen garden, and fields of Indian corn, wheat, flax and pumpkins. Hannah, your wife, is in the garden. Ranger, your dog, follows you everywhere.
 - **The forest path:** a long walk through the woods beside a creek, which bends west under a footbridge as you leave the forest.
+- **Heron Pond:** halfway along the forest path, a narrow trail turns west through the trees to a pond in a sunny clearing, ringed with cattails, wild mint, loosestrife and raspberry brambles.
 - **The crossroads:** the Plough & Harrow tavern, with smoking chimneys, a stable with horses, and a signpost.
 - **Inside the tavern:** order an ale from Mr. Hale, sit with the neighbors, and listen to the gossip.
 - **The wheat mystery:** the first quest, about wheat rust and the barberry hedge.
+- **Liberty tea:** once the wheat mystery is solved, Hannah asks you to gather herbs at Heron Pond for a tea that boycotts the King's.
+- **Quest markers:** a small gold "!" marks where a quest can be started: first the wheat, then Hannah once the wheat mystery is done.
 - **Historical notes:** looking at things, and some conversations, add a short note about colonial life.
 - **Sound:** all synthesized in the browser with the Web Audio API: the creek, birds, wind in the forest, chickens, the ox, the tavern fire and chatter, and footsteps.
 
@@ -55,7 +58,8 @@ All dialogue lives near the top of the script in `index.html`:
 
 - `TALK` holds what each person says and the descriptions of things you can look at.
 - `NOTES` holds the historical notes.
-- `SPECIAL` and `QUEST` hold the wheat mystery quest.
+- `SPECIAL` and `QUEST` hold the wheat mystery quest. `SPECIAL` also holds the liberty tea quest, with `HERBS`, `teaTask` and `setTea` next to it.
+- `questStarts` decides where the "!" markers appear.
 
 ## Rebuilding the art
 
@@ -71,4 +75,4 @@ This rewrites everything in `world/` and saves map previews to `build/previews/`
 
 - `pix.py`: drawing helpers (auto-shaded sprites from region art, trees, buildings, grass, dirt and water)
 - `chars.py`, `sprites2.py`, `props.py`: characters, animals and props as hand-typed pixel art
-- `game_world.py`: lays out the outdoor map and the tavern interior
+- `game_world.py`: lays out the outdoor map and the tavern interior. Heron Pond and its trail use their own random seed, so changing them doesn't move the rest of the forest.

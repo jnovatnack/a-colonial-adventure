@@ -42,8 +42,8 @@ class World:
     def act(self, r, id_, label):
         self.acts.append({'r': [int(v) for v in r], 'id': id_, 'label': label})
 
-    def tree(self, bx, by, R=None, kind=None, tones=TG, pine=False):
-        """Place a tree so its trunk base sits at (bx, by)."""
+    def tree(self, bx, by, R=None, kind=None, tones=TG, pine=False, skip=False):
+        """Place a tree so its trunk base sits at (bx, by). skip=True still draws from the rng, so later trees don't move."""
         rng = self.rng
         if pine:
             t = make_pine(int(R or 34), PINE, rng)
@@ -51,11 +51,51 @@ class World:
             t = make_tree(int(R or 12), tones, rng,
                           fruit=((220, 48, 48), (150, 24, 36)) if kind == 'a' else None,
                           blossoms=[(255, 236, 244), (248, 184, 212)] if kind == 'b' else None)
+        if skip:
+            return t
         h, w = t.shape[:2]
         x, y = int(bx - w / 2), int(by - h + 3)
         self.sc.foot_shadow(bx + 2, by, w * 0.4, 3)
         self.add(t, x, y, box=(w // 2 - 5, h - 9, w // 2 + 5, h - 2))
         return t
+
+
+# ============================================================ HERON POND
+# The three Liberty Tea herbs grow in clumps around the pond, each on its own side, so the player walks all the way round.
+HERBS = {
+    'loosestrife': [(118, 372), (134, 378), (88, 371)],  # north bank, in the sun
+    'mint': [(98, 437), (112, 434), (78, 436)],  # the wet south edge
+    'raspberry': [(46, 372), (32, 388)],  # brambles at the west edge of the clearing
+}
+
+
+def pond_dressing(wd, pond, meadow, trail):
+    rng = np.random.default_rng(1773 * 2)
+    sc = wd.sc
+    sprites = {'mint': S2.mint(), 'loosestrife': S2.loosestrife()}
+    for kind, spots in HERBS.items():
+        for (x, y) in spots:
+            if kind == 'raspberry':
+                spr = S2.bush(rng, tones=((40, 84, 44), (64, 124, 56), (100, 160, 72), (150, 200, 104)),
+                              berries=((200, 40, 72), (140, 24, 52)))
+                h, w = spr.shape[:2]
+                sc.foot_shadow(x + 1, y, w * 0.4, 2.5)
+                wd.add(spr, x - w // 2, y - h + 3, box=(3, h - 8, w - 3, h - 1))
+                wd.act([x - w // 2 - 2, y - h + 2, x + w // 2 + 2, y + 6], 'herb_raspberry', 'PICK')
+            else:
+                spr = sprites[kind]
+                h, w = spr.shape[:2]
+                wd.add(spr, x - w // 2, y - h, box=None)
+                wd.act([x - w // 2 - 3, y - h - 2, x + w // 2 + 3, y + 5], 'herb_' + kind, 'PICK')
+    ct = S2.cattails()
+    for (x, y) in ((52, 410), (140, 404), (60, 424), (146, 392)):
+        wd.add(ct, x - ct.shape[1] // 2, y - ct.shape[0], box=None)
+    for (x, y) in ((150, 418), (64, 386)):
+        wd.add(P.rock(1), x - 5, y - 4, box=(1, 2, 10, 7))
+    wd.add(S2.log(), 62, 446, box=(0, 1, 26, 7))
+    # one look over the whole pond, added after the herbs so their acts win
+    ys, xs = np.nonzero(pond)
+    wd.act([xs.min() - 2, ys.min() - 2, xs.max() + 3, ys.max() + 3], 'pond', 'LOOK')
 
 
 # ============================================================ OUTDOORS
@@ -128,6 +168,32 @@ def outdoor():
     for (x, y) in ((292, 300), (275, 470), (300, 246)):
         wd.act([x - 14, y - 14, x + 14, y + 14], 'creek', 'LOOK')
 
+    # ---- HERON POND: a narrow trail west from the middle of the wood path to a pond in a sunny clearing.
+    # It has its own rng so everything drawn after it comes out exactly as before.
+    prng = np.random.default_rng(1773)
+    meadow = ellipse(sc.shape, 98, 402, 80, 54)
+    lift = meadow & forest_floor
+    sc.img[lift & (B > 0.35)] /= np.array([0.78, 0.82, 0.80])
+    sc.img[meadow & ~erode(meadow, 6) & (B > 0.5) & lift] *= np.array([0.9, 0.92, 0.9])
+    trail = thick_path(sc.shape, [(256, 397), (234, 392), (208, 400), (184, 395), (160, 401), (146, 404)], 4, prng, wob=0.6)
+    trail &= ~path
+    dirt(sc, trail, DF, prng, lip=G[0], pebbles=40)
+    pond = ellipse(sc.shape, 100, 404, 44, 24) | ellipse(sc.shape, 72, 414, 22, 14) | ellipse(sc.shape, 126, 396, 20, 13)
+    water(sc, pond, Wt, prng, bank=((104, 88, 60), (150, 128, 86)))
+    for (x, y) in ((82, 404), (118, 412), (94, 418), (110, 392)):  # lily pads
+        pad = ellipse(sc.shape, x, y, 3.5, 2.2)
+        sc.img[dilate(pad, 1) & ~pad & pond] = (24, 52, 50)
+        sc.img[pad] = (72, 140, 72)
+        sc.put(x - 1, y - 1, (120, 180, 96))
+        sc.put(x + 1, y, (24, 52, 50))
+    sc.put(94, 417, (248, 240, 248)); sc.put(95, 417, (240, 200, 220))  # a water lily
+    wd.block |= pond
+    # no tree trunks in the clearing or beside the trail, nor just south of them, where canopies would hide the ground
+    pond_room = meadow | dilate(trail, 10)
+    for k in range(1, 22):
+        pond_room[k:] |= (meadow | dilate(trail, 6))[:-k]
+    trail_wide = dilate(trail, 3)
+
     # ---- forest trees (avoid clearings, path, creek)
     corridor = dilate(path | road, 11) | dilate(creek, 8) | dilate(tyard | yard, 6)
     for (x0, y0, x1, y1) in ((48, 440 + DY, 170, 530 + DY), (200, 440 + DY, 500, 530 + DY), (440, 480 + DY, 500, 560 + DY)):
@@ -142,18 +208,22 @@ def outdoor():
                 continue
             pts.append((x, y))
     for (x, y) in pts:
+        gone = pond_room[min(max(y, 0), H_ - 1), min(max(x, 0), W_ - 1)]
         if rng.random() < 0.3:
-            wd.tree(x, y, 34 + int(rng.integers(-4, 6)), pine=True)
+            wd.tree(x, y, 34 + int(rng.integers(-4, 6)), pine=True, skip=gone)
         else:
-            wd.tree(x, y, int(rng.integers(11, 15)), tones=TD if rng.random() < 0.6 else TG)
+            wd.tree(x, y, int(rng.integers(11, 15)), tones=TD if rng.random() < 0.6 else TG, skip=gone)
     fern = S2.fern()
     mush = S2.mushrooms()
     near = (dilate(path, 14) | dilate(creek, 12)) & ~dilate(path, 8) & ~clear & ~dilate(creek, 4)
     ys, xs = np.nonzero(near)
     for i in rng.choice(len(ys), 70, replace=False):
         x, y = xs[i], ys[i]
+        if trail_wide[y, x]:
+            continue
         spr = fern if i % 3 else mush
         wd.add(spr, x - spr.shape[1] // 2, y - spr.shape[0], box=None)
+    pond_dressing(wd, pond, meadow, trail)
     wd.add(S2.log(), 196, 300, box=(0, 1, 26, 7))
     wd.add(S2.log(), 200, 484, box=(0, 1, 26, 7))
     for (x, y) in ((214, 244), (204, 420), (204, 566), (322, 270), (318, 420)):

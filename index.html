@@ -154,6 +154,11 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
     pumpkins: { name: null, lines: [['Pumpkins and squash, fattening on the vine.']] },
     creek: { name: null, lines: [['The creek runs quick and cold over the stones.']] },
     log: { name: null, lines: [['A fallen oak, soft with moss. Something has been digging beneath it.']] },
+    pond: { name: null, lines: [['A still pond ringed with cattails. A heron lifts off the far bank and flaps away over the trees.'],
+      ['Dragonflies skim the lily pads. Something plops into the water by the reeds.']] },
+    herb_loosestrife: { name: null, lines: [['Slender stalks with leaves in fours, dotted with little yellow star flowers.']] },
+    herb_mint: { name: null, lines: [['Wild mint grows thick in the wet ground. It smells sharp and clean when you brush it.']] },
+    herb_raspberry: { name: null, lines: [['A raspberry bramble. The berries are long gone, but the leaves are thick and green.']] },
     signpost: { name: null, lines: [['West: Concord, 4 miles. East: the Boston road.']] },
     tavern_sign: { name: null, lines: [['THE PLOUGH & HARROW. A painted tankard swings from the bracket.']] },
     tavern_door: { name: null, lines: [] },
@@ -210,6 +215,12 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
     'widow:0': '"Meeting" meant Sunday worship at the meetinghouse. In New England the same building also hosted town meetings, where men voted on local affairs.',
     'widow:1': 'A "receipt" was the colonial word for a recipe.',
     'trapper:0': 'Beaver fur was prized in Europe for making felt hats. By the 1700s, trapping had made beaver scarce in much of New England.',
+    pond: 'Many ponds around Concord are "kettle ponds." They formed when big blocks of ice left behind by retreating glaciers melted in the ground. Walden Pond, about two miles south of Concord center, is the most famous.',
+    tea_boycott: 'After the Tea Act of 1773, many patriot households gave up imported tea. Boston women had already shown the way: in 1770 hundreds of them signed a pledge to drink no tea until Parliament\'s taxes were repealed.',
+    loosestrife: 'Four-leaved loosestrife, a native wildflower, gave its name to "liberty tea." Families dried the leaves and steeped them in place of the taxed tea from England.',
+    mint: 'Wild mint grows in damp ground across North America. Native peoples used it in medicines and teas, and colonists brewed it too, especially once drinking imported tea became unpatriotic.',
+    raspberry: 'Dried raspberry leaves made one of the most popular tea substitutes, and they had long been used as a home remedy.',
+    liberty_tea: 'The tea boycott gave women a central part in the resistance, since they ran the household and decided what was served. In October 1774 the Continental Congress went further, banning imports of British goods, tea included, from that December.',
     keeper: 'Taverns were the heart of colonial public life. Neighbors read newspapers aloud there, held meetings, and argued politics. Many revolutionary committees met over a mug of ale.',
   };
   const note = (text) => ['HISTORICAL NOTE', text, 'note'];
@@ -219,7 +230,7 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
     outdoor: [
       ['THE PLOUGH & HARROW', 140, 0, 262, 96], ['THE STABLE', 322, 0, 470, 96], ['THE CROSSROADS', 262, 70, 340, 120],
       ['THE FOOTBRIDGE', 276, 126, 318, 172], ['THE KITCHEN GARDEN', 58, 642, 160, 716], ['THE HOMESTEAD', 160, 626, 500, 762],
-      ['THE FIELDS', 30, 762, 470, 900], ['THE WOOD PATH', 120, 172, 440, 626],
+      ['THE FIELDS', 30, 762, 470, 900], ['HERON POND', 16, 346, 182, 462], ['THE WOOD PATH', 120, 172, 440, 626],
     ],
     tavern: [['THE PLOUGH & HARROW', 0, 0, 256, 192]],
   };
@@ -484,7 +495,7 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
     p: { x: 0, y: 0, dir: 'down', frame: 0, anim: 0, moving: false, seat: null },
     dog: { x: 0, y: 0, dir: 'down', frame: 0, anim: 0, waiting: null, stuck: 0 },
     trail: [], keys: new Set(), stick: null, chickens: [], puffs: [], smokeT: 0,
-    pence: 30, ale: 0, emptyMug: false, talkIdx: {}, quest: 0, holtNag: false,
+    pence: 30, ale: 0, emptyMug: false, talkIdx: {}, quest: 0, holtNag: false, tea: 0, herbs: [], jonahHint: false,
     dialog: null, fade: 0, fadeDir: 0, pending: null, target: null,
     region: '', toastT: 0, scale: 2, view: [320, 200], time: 0,
   };
@@ -528,6 +539,7 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
     S.map = st.map; S.p.x = st.x; S.p.y = st.y; S.p.dir = st.dir || 'down';
     if (snap && typeof snap.pence === 'number') { S.pence = snap.pence; S.ale = snap.ale || 0; }
     setQuest((snap && snap.quest) || 0, false);
+    if (snap && snap.tea) { S.herbs = snap.herbs || []; setTea(snap.tea, false); }
     S.dog.x = S.p.x + 14; S.dog.y = S.p.y + 2;
     if (S.map !== 'outdoor') { const d = S.maps.tavern.doors[0].spawn; S.dog.waiting = [d[0] + 14, d[1] + 4]; S.dog.x = S.dog.waiting[0]; S.dog.y = S.dog.waiting[1]; }
     const snd = W.maps.outdoor.sound;
@@ -681,7 +693,9 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
     for (const a of m.acts) {
       if (inR(q, a.r)) {
         if (a.id === 'tavern_door') continue;
-        return { kind: 'act', id: a.id, label: a.label, ax: (a.r[0] + a.r[2]) / 2, ay: a.r[1] - 4 };
+        const herb = a.id.startsWith('herb_') && a.id.slice(5);
+        const label = herb && (S.tea !== 1 || S.herbs.includes(herb)) ? 'LOOK' : a.label;
+        return { kind: 'act', id: a.id, label, ax: (a.r[0] + a.r[2]) / 2, ay: a.r[1] - 4 };
       }
     }
     return null;
@@ -706,16 +720,52 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
     'Ezra blames the barberry hedge. Go home and tell Hannah.',
     'The barberry hedge comes out before spring planting.',
   ];
+  // The task box shows one task at a time; a finished task fades out after a few seconds.
+  function showTask(text, done, announce) {
+    const q = $('quest');
+    if (!text) { q.hidden = true; return; }
+    q.hidden = false; q.classList.remove('fade');
+    $('qlabel').textContent = done ? 'TASK COMPLETE' : 'TASK';
+    $('qtext').textContent = text;
+    if (announce) toast(announce);
+    clearTimeout(showTask.t);
+    if (done) showTask.t = setTimeout(() => q.classList.add('fade'), 7000);
+  }
   function setQuest(stage, announce = true) {
     S.quest = stage;
-    const q = $('quest');
-    if (!QUEST[stage]) { q.hidden = true; return; }
-    q.hidden = false; q.classList.remove('fade');
-    $('qlabel').textContent = stage === 3 ? 'TASK COMPLETE' : 'TASK';
-    $('qtext').textContent = QUEST[stage];
-    if (announce) toast(stage === 3 ? 'TASK COMPLETE' : 'NEW TASK');
-    clearTimeout(setQuest.t);
-    if (stage === 3) setQuest.t = setTimeout(() => q.classList.add('fade'), 7000);
+    showTask(QUEST[stage], stage === 3, announce && (stage === 3 ? 'TASK COMPLETE' : 'NEW TASK'));
+  }
+  // ------------------------------------------------------------------ liberty tea
+  // Stage 0: not offered (Hannah offers it once the wheat mystery is solved). 1: gather the three herbs at Heron Pond.
+  // 2: all gathered, take them home. 3: Hannah has her tea, task done.
+  const HERBS = { loosestrife: 'loosestrife', mint: 'wild mint', raspberry: 'raspberry leaves' };
+  function teaTask() {
+    if (S.tea === 1) {
+      const left = Object.keys(HERBS).filter((k) => !S.herbs.includes(k)).map((k) => HERBS[k]);
+      return 'Gather ' + left.join(', ').replace(/, ([^,]*)$/, ' and $1') + ' at Heron Pond, west off the wood path. (' + S.herbs.length + '/3)';
+    }
+    return [null, null, 'Bring the herbs home to Hannah.', 'Hannah has her liberty tea for Thursday.'][S.tea];
+  }
+  function setTea(stage, announce = true) {
+    S.tea = stage;
+    showTask(teaTask(), stage === 3, announce && (stage === 3 ? 'TASK COMPLETE' : 'NEW TASK'));
+  }
+  function pickHerb(kind, lines) {
+    if (S.tea !== 1 || S.herbs.includes(kind)) return null;
+    return { lines, then: () => {
+      S.herbs.push(kind);
+      AUD.play('step', 'grass');
+      if (S.herbs.length === 3) setTea(2);
+      else showTask(teaTask(), false, HERBS[kind].toUpperCase() + ' ' + S.herbs.length + '/3');
+    } };
+  }
+  function questStarts() {
+    // Where a "!" marks something the player can start a task from.
+    const out = [];
+    if (S.map !== 'outdoor') return out;
+    if (S.quest === 0) { const a = M().acts.find((q) => q.id === 'wheat'); if (a) out.push({ id: 'wheat', x: a.r[0] + 34, y: a.r[1] + 18 }); }
+    if (S.quest === 3 && S.tea === 0) { const n = M().npcs.find((q) => q.id === 'wife'); if (n) out.push({ id: 'wife', x: n.x, y: n.y - 28 }); }
+    return out;
   }
   const SPECIAL = {
     wheat() {
@@ -742,7 +792,41 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
           ['HANNAH', 'My barberry? I make my jelly from those berries!'],
           ['HANNAH', '...Well. I\'d sooner have bread than jelly. If it must come out, it must.']], then: () => setQuest(3) };
       }
+      if (S.tea === 0) {
+        return { lines: [['HANNAH', 'Now, there\'s another thing. Widow Abbot and the Fletcher women are coming to sit with me Thursday.'],
+          ['HANNAH', 'And I\'ll not pour the King\'s tea in this house. Not while Boston harbor is shut and his soldiers stand on every corner.'],
+          ['YOU', 'Then what will you pour?'],
+          ['HANNAH', 'Liberty tea. For that I need loosestrife, wild mint and raspberry leaves.'],
+          ['HANNAH', 'Jonah says all three grow round Heron Pond. Halfway along the wood path, a little trail turns west through the trees.'],
+          note(NOTES.tea_boycott)], then: () => setTea(1) };
+      }
+      if (S.tea === 1) {
+        return { lines: [['HANNAH', S.herbs.length ? 'That\'s a start. I still want ' + teaTask().replace(/^Gather (.*) at Heron.*$/, '$1') + '.'
+          : 'Loosestrife, wild mint and raspberry leaves. Take the little trail west, halfway along the wood path.']] };
+      }
+      if (S.tea === 2) {
+        return { lines: [['HANNAH', 'Loosestrife, mint and raspberry! Let me smell. Oh, that will do very nicely.'],
+          [null, 'Hannah ties the herbs into bundles and hangs them from the beam by the hearth to dry.'],
+          ['HANNAH', 'Let the Tories in Boston keep their Bohea. Ours will be home-grown, and I\'ll say so to anyone who asks.'],
+          note(NOTES.liberty_tea)], then: () => setTea(3) };
+      }
       return null;
+    },
+    herb_loosestrife() {
+      return pickHerb('loosestrife', [[null, 'You snap off a good bundle of loosestrife stalks, leaves and little yellow flowers and all.'], note(NOTES.loosestrife)]);
+    },
+    herb_mint() {
+      return pickHerb('mint', [[null, 'You kneel in the soft mud and pick a fistful of wild mint. Your fingers smell of it for an hour.'], note(NOTES.mint)]);
+    },
+    herb_raspberry() {
+      return pickHerb('raspberry', [[null, 'You reach carefully past the thorns and strip a handful of raspberry leaves. Only one scratch.'], note(NOTES.raspberry)]);
+    },
+    trapper() {
+      if (S.tea !== 1 || S.jonahHint) return null;
+      S.jonahHint = true;
+      return { lines: [['YOU', 'Jonah, Hannah\'s sent me for tea herbs. Loosestrife, mint and raspberry. She says you know Heron Pond.'],
+        ['JONAH, A TRAPPER', 'Heron Pond? West off the wood path, about halfway. Mint grows thick in the mud on the south side.'],
+        ['JONAH, A TRAPPER', 'Raspberry canes at the west edge of the clearing. Mind the thorns.']] };
     },
     holt() {
       if (S.quest === 1) {
@@ -1083,6 +1167,17 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
       ctx.fillStyle = g; ctx.fillRect(0, 0, m.w, m.h);
       ctx.globalCompositeOperation = 'source-over';
     }
+    // "!" over things that start a task, unless the target arrow is already there
+    if (!S.dialog) {
+      const tid = S.target && (S.target.id || S.target.npc?.id);
+      for (const q of questStarts()) {
+        if (q.id === tid) continue;
+        const x = Math.round(q.x), y = Math.round(q.y) - (Math.floor(S.time * 3) % 2);
+        ctx.fillStyle = '#1c141e'; ctx.fillRect(x - 2, y - 9, 5, 7); ctx.fillRect(x - 2, y - 1, 5, 4);
+        ctx.fillStyle = '#f4cc5c'; ctx.fillRect(x - 1, y - 8, 3, 5); ctx.fillRect(x - 1, y, 3, 2);
+        ctx.fillStyle = '#fff4c8'; ctx.fillRect(x - 1, y - 8, 1, 3);
+      }
+    }
     // target marker
     if (S.target && !S.dialog) {
       const t = S.target, bob = Math.floor(S.time * 4) % 2;
@@ -1104,7 +1199,7 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
     load(snap || {}).catch((e) => { const el = $('err'); el.hidden = false; el.textContent = e.message + '. Reload the page to try again.'; });
     requestAnimationFrame(loop);
   }
-  window.claude?.hot?.snapshot?.(() => ({ map: S.map, x: S.p.x, y: S.p.y, dir: S.p.dir, pence: S.pence, ale: S.ale, quest: S.quest }));
+  window.claude?.hot?.snapshot?.(() => ({ map: S.map, x: S.p.x, y: S.p.y, dir: S.p.dir, pence: S.pence, ale: S.ale, quest: S.quest, tea: S.tea, herbs: S.herbs }));
   window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
 })();
 </script>
