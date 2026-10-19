@@ -1,0 +1,1112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>A Colonial Adventure</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Silkscreen&display=swap">
+<style>
+/* Single dark look: the game screen fills the window; HUD and dialog float in pixel type over it. */
+:root {
+  --ink: #0d0c14;
+  --panel: rgba(20, 16, 28, 0.9);
+  --paper: #f4ecd8;
+  --gold: #f4cc5c;
+  --muted: #b5aea0;
+  --pixel: "Silkscreen", "Courier New", monospace;
+  --display: "IM Fell English", Georgia, serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; margin: 0; }
+[hidden] { display: none !important; }
+body { background: var(--ink); color: var(--paper); overflow: hidden; font-family: var(--pixel); }
+#stage { position: fixed; inset: 0; background: var(--ink); touch-action: none; }
+canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
+.hud { position: fixed; pointer-events: none; }
+.chip { padding: 6px 12px; background: var(--panel); border: 3px solid var(--paper); font-size: 12px; letter-spacing: 1px; line-height: 1.3; }
+.chip small { display: block; color: var(--gold); font-size: 10px; }
+#place { top: calc(env(safe-area-inset-top, 0px) + 14px); left: max(16px, env(safe-area-inset-left, 0px)); }
+#quest {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); left: max(16px, env(safe-area-inset-left, 0px));
+  max-width: min(280px, calc(100% - 140px)); font-size: 11px; line-height: 1.45; letter-spacing: 0.5px;
+  border-color: var(--gold); transition: opacity 0.6s;
+}
+#quest small { margin-bottom: 2px; }
+#quest.fade, body.talking #quest { opacity: 0; }
+#purse { top: calc(env(safe-area-inset-top, 0px) + 14px); right: max(16px, env(safe-area-inset-right, 0px)); text-align: right; }
+#toast {
+  top: calc(env(safe-area-inset-top, 0px) + 70px); left: 50%; transform: translateX(-50%);
+  font-size: 15px; letter-spacing: 2px; white-space: nowrap;
+  text-shadow: 2px 2px 0 var(--ink), -2px 2px 0 var(--ink), 2px -2px 0 var(--ink), -2px -2px 0 var(--ink);
+  opacity: 0; transition: opacity 0.4s;
+}
+#toast.on { opacity: 1; }
+#hint {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); left: 50%; transform: translateX(-50%);
+  font-size: 11px; letter-spacing: 1px; white-space: nowrap; transition: opacity 0.3s;
+}
+#hint b { color: var(--gold); font-weight: normal; }
+#hint.off { opacity: 0; }
+#dialog {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  width: min(640px, calc(100% - 32px)); box-sizing: border-box;
+  padding: 14px 18px 16px; background: var(--panel); border: 3px solid var(--paper);
+  box-shadow: 0 0 0 3px var(--ink); cursor: pointer; display: flex; flex-direction: column; gap: 6px;
+}
+#dname { font-size: 11px; letter-spacing: 1px; color: var(--gold); }
+#dtext { font-family: var(--display); font-size: 20px; line-height: 1.35; min-height: 2.7em; }
+#dialog.note { border-color: var(--gold); background: rgba(44, 34, 22, 0.94); }
+#dialog.note #dname { color: var(--paper); }
+#dialog.note #dname::before { content: "\2726  "; color: var(--gold); }
+#dialog.note #dtext { font-style: italic; font-size: 18px; color: #efe3c4; }
+#dmore { position: absolute; right: 14px; bottom: 8px; font-size: 12px; color: var(--gold); animation: bob 0.8s steps(2) infinite; }
+@keyframes bob { 50% { transform: translateY(3px); } }
+#abtn {
+  position: fixed; right: max(20px, env(safe-area-inset-right, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 90px);
+  width: 64px; height: 64px; border-radius: 50%; border: 3px solid var(--paper); background: rgba(244, 204, 92, 0.85);
+  color: var(--ink); font: inherit; font-size: 18px;
+}
+#stick { position: fixed; width: 84px; height: 84px; margin: -42px 0 0 -42px; border: 3px solid rgba(244, 236, 216, 0.6); border-radius: 50%; pointer-events: none; }
+#stick i { position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; margin: -15px 0 0 -15px; border-radius: 50%; background: rgba(244, 236, 216, 0.7); }
+#snd {
+  position: fixed; top: calc(env(safe-area-inset-top, 0px) + 66px); right: max(16px, env(safe-area-inset-right, 0px));
+  font: inherit; font-size: 10px; letter-spacing: 1px; color: var(--paper); cursor: pointer; min-height: 32px;
+}
+#snd:hover { border-color: var(--gold); }
+#snd:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+#fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+#title {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(13, 12, 20, 0.55);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.card {
+  max-width: 440px; width: 100%; box-sizing: border-box; padding: 26px 24px 22px;
+  background: var(--panel); border: 3px solid var(--paper); box-shadow: 0 0 0 3px var(--ink), 6px 6px 0 3px var(--ink);
+  display: flex; flex-direction: column; gap: 14px; text-align: center;
+}
+.card .eyebrow { font-size: 11px; letter-spacing: 2px; color: var(--gold); }
+.card h1 { margin: 0; font-family: var(--display); font-weight: 400; font-size: 46px; line-height: 1; text-wrap: balance; }
+.card p { margin: 0; font-family: var(--display); font-size: 18px; color: var(--muted); line-height: 1.35; }
+.card button {
+  font: inherit; font-size: 14px; letter-spacing: 2px; color: var(--ink); background: var(--gold);
+  border: 3px solid var(--ink); padding: 12px 18px; cursor: pointer; align-self: center; min-height: 48px;
+}
+.card button:hover { background: var(--paper); }
+.card button:focus-visible { outline: 3px solid var(--paper); outline-offset: 3px; }
+.keys { font-size: 10px; color: var(--muted); letter-spacing: 1px; line-height: 1.7; }
+#err { color: var(--gold); font-size: 11px; }
+</style>
+</head>
+<body>
+
+<div id="stage"><canvas id="c" aria-label="Top-down view of the game world"></canvas></div>
+<div class="hud chip" id="place">MIDDLESEX COUNTY<small>LATE SUMMER, 1774</small></div>
+<div class="hud chip" id="quest" hidden><small id="qlabel">TASK</small><span id="qtext"></span></div>
+<div class="hud chip" id="purse">PURSE<small id="coins">2s 6d</small></div>
+<div class="hud" id="toast"></div>
+<div class="hud chip off" id="hint"></div>
+<div id="dialog" hidden role="dialog" aria-live="polite"><div id="dname"></div><div id="dtext"></div><div id="dmore">&#9660;</div></div>
+<button id="abtn" type="button" hidden aria-label="Talk or look">A</button>
+<div id="stick" hidden><i></i></div>
+<button id="snd" class="chip" type="button" aria-pressed="true">SOUND ON</button>
+<div id="fade"></div>
+<div id="title">
+  <div class="card">
+    <div class="eyebrow">CHAPTER ONE &middot; LATE SUMMER, 1774</div>
+    <h1>Concord, 1775</h1>
+    <p>Your farm sits at the edge of the wood. Past the creek, at the crossroads, the tavern fire is lit.</p>
+    <button id="start" type="button">PRESS START</button>
+    <div class="keys" id="keys">ARROWS OR WASD TO WALK &middot; SHIFT TO RUN<br>E OR SPACE TO TALK, LOOK AND SIT<br>M TO MUTE &middot; BEST WITH HEADPHONES</div>
+    <div id="err" hidden></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const BASE = 'world/';
+
+  // ------------------------------------------------------------------ words
+  // Everything people say lives here, so it is easy to rewrite as the story grows.
+  const TALK = {
+    wife: { name: 'HANNAH', lines: [
+      ['The beans want picking before the frost comes. Off to the tavern, are you?'],
+      ['Mind you are home by dark. The wood path is no place to be at night.'],
+      ['If you see Widow Abbot, tell her I have a jar of plum preserves set by for her.'],
+    ] },
+    dog: { name: null, lines: [
+      ['Ranger thumps his tail against the dirt and leans into your hand.'],
+      ['Ranger sniffs your boots hopefully. No supper scraps yet, old boy.'],
+      ['Ranger gives a short bark and trots in a circle, ready for a walk.'],
+    ] },
+    house_door: { name: null, lines: [['The smell of baking bread drifts out. Best not track mud across Hannah\'s clean floor.']] },
+    barn_door: { name: null, lines: [['The barn smells of hay and old harness leather. The ox is dozing in his stall.']] },
+    well: { name: null, lines: [['You lower the bucket. The well water comes up cold and clear.']] },
+    coop: { name: null, lines: [['The hens eye you with deep suspicion.']] },
+    laundry: { name: null, lines: [['Hannah\'s washing, drying in the sun.']] },
+    woodpile: { name: null, lines: [['A good stack of split oak. Winter will want twice as much.']] },
+    garden: { name: null, lines: [['Hannah\'s kitchen garden. Cabbages, squash and a row of beans.']] },
+    corn: { name: null, lines: [['Indian corn, nearly as tall as you. The ears are filling out nicely.']] },
+    wheat: { name: null, lines: [['Winter wheat, gold and ready for the sickle.']] },
+    flax: { name: null, lines: [['Flax in blue flower. Come winter, Hannah will spin it into linen.']] },
+    pumpkins: { name: null, lines: [['Pumpkins and squash, fattening on the vine.']] },
+    creek: { name: null, lines: [['The creek runs quick and cold over the stones.']] },
+    log: { name: null, lines: [['A fallen oak, soft with moss. Something has been digging beneath it.']] },
+    signpost: { name: null, lines: [['West: Concord, 4 miles. East: the Boston road.']] },
+    tavern_sign: { name: null, lines: [['THE PLOUGH & HARROW. A painted tankard swings from the bracket.']] },
+    tavern_door: { name: null, lines: [] },
+    horse_bay: { name: null, lines: [['A bay mare, saddled and patient. Her rider has come a long way.']] },
+    horse_grey: { name: null, lines: [['An old grey gelding, dozing in the sun.']] },
+    fireplace: { name: null, lines: [['The fire crackles. A kettle hangs from the crane, just starting to sing.']] },
+    window: { name: null, lines: [['Through the wavy glass you can see the crossroads and the horses at the rail.']] },
+    holt: { name: 'EZRA HOLT', lines: [
+      ['Corn\'s come in tall this year. If the weather holds, we\'ll all have a fine harvest.'],
+      ['They say the militia is to drill on the green every week now. Every man to bring his own powder.'],
+      ['My cow broke through Silas\'s fence again. He\'s not spoken a civil word to me since Tuesday.'],
+    ] },
+    brewer: { name: 'SILAS BREWER', lines: [
+      ['Mark me, Parliament will tax the very air we breathe before they\'re done.'],
+      ['A peddler came up from Boston. Says the harbor is shut tight and there are soldiers on every corner.'],
+      ['Ezra\'s cow ate half my turnips. Half!'],
+    ] },
+    widow: { name: 'WIDOW ABBOT', lines: [
+      ['Did you hear? The Fletcher boy walked the miller\'s daughter home from meeting, bold as brass.'],
+      ['How is Hannah keeping? Tell her I still have that receipt for her apple cake.'],
+      ['Strangers on the Boston road last night. Two riders, in a terrible hurry. Didn\'t stop to drink.'],
+    ] },
+    trapper: { name: 'JONAH, A TRAPPER', lines: [
+      ['Furs are poor this year. The beaver have all gone north.'],
+      ['Keep to the path in the wood. There\'s a bear been seen up past the creek.'],
+    ] },
+  };
+  // Historical notes shown after looking at things or talking to people.
+  // Keys are an object or person id, or "id:n" for a person's nth line (counting from 0).
+  const NOTES = {
+    corn: 'Indian corn (maize) was the backbone of the New England farm. English settlers learned to grow it from Native farmers, and it fed the family, the pigs and the cattle alike.',
+    wheat_rust: 'The "rust" or "blast" in your wheat is stem rust, caused by a fungus. Part of its life cycle has to happen on barberry bushes, and the spores then blow onto nearby wheat. Because of it, many New England farmers gave up on wheat and grew rye instead.',
+    wheat_law: 'Colonial farmers spotted the barberry link long before anyone could explain it. Connecticut ordered barberry destroyed in 1726, Massachusetts in 1755 and Rhode Island in 1766, some of the first plant-disease laws anywhere. Scientists proved the farmers right about a century later.',
+    barberry: 'Common barberry came over from Europe with early settlers. They planted it for hedges, used the tart berries for jams and jellies, and made yellow dye from the bark and roots.',
+    barberry_after: 'The fight against barberry went on for centuries. In the 1900s the United States ran a decades-long campaign that destroyed hundreds of millions of barberry bushes to protect its wheat.',
+    flax: 'Nearly every farm grew flax. The stalks were soaked, beaten and combed into fibers, then spun and woven into linen at home. When colonists boycotted British goods in the 1760s and 1770s, wearing homespun became a patriotic statement.',
+    pumpkins: 'Pumpkins and squash were another crop colonists learned from Native peoples. They kept well into winter and were stewed, baked or dried in strips.',
+    garden: 'The kitchen garden was usually the wife\'s domain: cabbages, beans, turnips, onions and herbs for cooking and for home remedies.',
+    well: 'Most farms dug their own well and lined it with fieldstone. Every drop for cooking, washing and the animals was hauled up by hand.',
+    woodpile: 'A New England farmhouse could burn 30 cords of wood or more in a year. Cutting, splitting and hauling firewood filled much of the winter.',
+    house_door: 'Many New England farmhouses were built around one massive central chimney, with fireplaces in several rooms sharing it to keep the whole house warm.',
+    barn_door: 'Oxen, not horses, did most of the plowing and hauling on New England farms. They were stronger, cheaper to feed, and could be butchered when their working days were done.',
+    coop: 'Hens were usually the farm wife\'s responsibility, and she could trade or sell the eggs for goods of her own.',
+    laundry: 'Washing day, usually Monday, was one of the hardest chores of the week: hauling and heating water and scrubbing with homemade soap made from wood ash and animal fat.',
+    creek: 'Streams like this one powered the gristmills and sawmills that every colonial town depended on. A good mill seat was one of the first things settlers looked for.',
+    signpost: 'Colonial roads were rough dirt tracks. The trip from Concord to Boston, under an hour by car today, could take most of a day by ox cart.',
+    tavern_sign: 'Taverns were often known by their painted signs, which travelers could recognize even if they couldn\'t read. Massachusetts law required towns to keep a licensed tavern for travelers.',
+    horse_bay: 'A good riding horse was expensive. Most farmers walked, or rode in an ox cart, and saved the horse for longer trips.',
+    fireplace: 'A favorite tavern drink was flip: beer, rum and sugar, heated by plunging a red-hot iron called a loggerhead into the mug.',
+    window: 'Window glass was imported from England and costly. In 1767 Parliament taxed it, along with paper, paint and tea, under the Townshend Acts.',
+    'holt:1': 'In the fall of 1774, Massachusetts towns began organizing special militia companies called minutemen, ready to turn out at a minute\'s warning.',
+    'brewer:0': 'Taxes like the Stamp Act (1765), the Townshend Acts (1767) and the Tea Act (1773) angered colonists, who had no representatives in Parliament. "No taxation without representation" became a rallying cry.',
+    'brewer:1': 'After the Boston Tea Party, Parliament passed the Boston Port Act of 1774, closing Boston Harbor until the ruined tea was paid for. British troops under General Gage occupied the town.',
+    'widow:0': '"Meeting" meant Sunday worship at the meetinghouse. In New England the same building also hosted town meetings, where men voted on local affairs.',
+    'widow:1': 'A "receipt" was the colonial word for a recipe.',
+    'trapper:0': 'Beaver fur was prized in Europe for making felt hats. By the 1700s, trapping had made beaver scarce in much of New England.',
+    keeper: 'Taverns were the heart of colonial public life. Neighbors read newspapers aloud there, held meetings, and argued politics. Many revolutionary committees met over a mug of ale.',
+  };
+  const note = (text) => ['HISTORICAL NOTE', text, 'note'];
+  const KEEPER = 'MR. HALE';
+  const ALE_COST = 2; // pence
+  const REGIONS = {
+    outdoor: [
+      ['THE PLOUGH & HARROW', 140, 0, 262, 96], ['THE STABLE', 322, 0, 470, 96], ['THE CROSSROADS', 262, 70, 340, 120],
+      ['THE FOOTBRIDGE', 276, 126, 318, 172], ['THE KITCHEN GARDEN', 58, 642, 160, 716], ['THE HOMESTEAD', 160, 626, 500, 762],
+      ['THE FIELDS', 30, 762, 470, 900], ['THE WOOD PATH', 120, 172, 440, 626],
+    ],
+    tavern: [['THE PLOUGH & HARROW', 0, 0, 256, 192]],
+  };
+
+  // ------------------------------------------------------------------ sound
+  // All sound is synthesized with the Web Audio API: no audio files to load.
+  // Where things are on the outdoor map; filled in from world.json when the world loads.
+  let CREEK = [], BRIDGE = [0, 0, 0, 0], BARN = [0, 0], STABLE = [], TAVERN_DOOR = [0, 0], FOREST = [146, 622];
+  const AUD = (() => {
+    let ac = null, master = null, muted = false, white = null, brown = null, hasPan = false;
+    const L = {};
+    const T = { bubble: 0, bird: 2, moo: 8 + Math.random() * 10, snort: 6, crackle: 0, murmur: 0, blip: 0 };
+    try { muted = localStorage.getItem('concord-muted') === '1'; } catch (e) { /* storage unavailable */ }
+
+    function noise(kind, secs) {
+      const n = Math.floor(ac.sampleRate * secs), b = ac.createBuffer(1, n, ac.sampleRate), d = b.getChannelData(0);
+      let last = 0;
+      for (let i = 0; i < n; i++) {
+        const w = Math.random() * 2 - 1;
+        if (kind === 'brown') { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; } else d[i] = w;
+      }
+      return b;
+    }
+    const loop = (buf) => { const s = ac.createBufferSource(); s.buffer = buf; s.loop = true; s.start(0, Math.random() * buf.duration); return s; };
+    const gain = (v) => { const g = ac.createGain(); g.gain.value = v; return g; };
+    const filt = (type, f, q = 0.7) => { const x = ac.createBiquadFilter(); x.type = type; x.frequency.value = f; x.Q.value = q; return x; };
+    function panner(p) {
+      if (hasPan) { const s = ac.createStereoPanner(); s.pan.value = Math.max(-1, Math.min(1, p)); return s; }
+      return gain(1);
+    }
+    function chain(...nodes) { for (let i = 0; i < nodes.length - 1; i++) nodes[i].connect(nodes[i + 1]); return nodes[nodes.length - 1]; }
+    const set = (param, v, tc = 0.25) => param.setTargetAtTime(v, ac.currentTime, tc);
+
+    function start() {
+      if (ac) { ac.resume(); return; }
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      ac = new AC();
+      hasPan = typeof ac.createStereoPanner === 'function';
+      const comp = ac.createDynamicsCompressor();
+      master = gain(muted ? 0 : 0.85);
+      chain(master, comp, ac.destination);
+      white = noise('white', 2.5);
+      brown = noise('brown', 4);
+
+      // creek: two bands of moving water, slowly swelling, panned toward the water
+      L.creekPan = panner(0);
+      L.creek = gain(0);
+      chain(L.creek, L.creekPan, master);
+      const lo = chain(loop(brown), filt('bandpass', 520, 0.8), gain(1.1));
+      const hi = chain(loop(white), filt('bandpass', 1700, 1.4), gain(0.16));
+      const hi2 = chain(loop(white), filt('bandpass', 3400, 2.5), gain(0.05));
+      for (const [node, rate, depth] of [[lo, 0.37, 0.5], [hi, 1.3, 0.08], [hi2, 2.1, 0.03]]) {
+        const lfo = ac.createOscillator(), d = gain(depth);
+        lfo.frequency.value = rate; chain(lfo, d, node.gain); lfo.start();
+        node.connect(L.creek);
+      }
+
+      // wind in the leaves
+      // The slow swell lives on its own gain stage, so the level below can switch the wind fully off outside the forest.
+      L.wind = gain(0);
+      const swell = gain(0.6);
+      chain(loop(white), filt('highpass', 1600), filt('lowpass', 7000), swell, L.wind, master);
+      const wl = ac.createOscillator(), wd = gain(0.4);
+      wl.frequency.value = 0.11; chain(wl, wd, swell.gain); wl.start();
+
+      // tavern: fire rumble + murmur of conversation (formant-filtered noise)
+      L.fire = gain(0);
+      chain(loop(brown), filt('lowpass', 170), L.fire, master);
+      L.murmurOut = filt('lowpass', 4000);
+      L.murmur = gain(0);
+      chain(L.murmur, L.murmurOut, master);
+      L.formants = [480, 1150, 2400].map((f, i) => {
+        const g = gain(0);
+        chain(loop(brown), filt('bandpass', f, 6 + i * 2), g, L.murmur);
+        return g;
+      });
+    }
+
+    // ---------- one-shot sounds
+    function env(g, t0, a, peak, d) {
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(peak, t0 + a);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + a + d);
+    }
+    function tone(type, f0, f1, dur, vol, pan = 0, filter = null, t0 = ac.currentTime) {
+      const o = ac.createOscillator(), g = gain(0);
+      o.type = type;
+      o.frequency.setValueAtTime(f0, t0);
+      o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + dur);
+      const nodes = [o];
+      if (filter) nodes.push(filter);
+      nodes.push(g, panner(pan), master);
+      chain(...nodes);
+      env(g, t0, Math.min(0.01, dur / 4), vol, dur);
+      o.start(t0); o.stop(t0 + dur + 0.05);
+    }
+    function burst(dur, vol, type, f, q, pan = 0, t0 = ac.currentTime) {
+      const s = ac.createBufferSource(), g = gain(0);
+      s.buffer = white;
+      chain(s, filt(type, f, q), g, panner(pan), master);
+      env(g, t0, 0.004, vol, dur);
+      s.start(t0, Math.random() * 2); s.stop(t0 + dur + 0.05);
+    }
+    const ok = () => ac && !muted && ac.state === 'running';
+
+    const fx = {
+      bubble(pan, vol) {
+        const f = 260 + Math.random() * 520;
+        tone('sine', f, f * (1.7 + Math.random()), 0.05 + Math.random() * 0.05, vol, pan);
+      },
+      chirp(pan, vol) {
+        const base = 2500 + Math.random() * 1800, n = 2 + Math.floor(Math.random() * 4);
+        let t = ac.currentTime;
+        for (let i = 0; i < n; i++) {
+          const up = Math.random() < 0.5;
+          tone('sine', base * (up ? 0.85 : 1.15), base * (up ? 1.2 : 0.8), 0.06 + Math.random() * 0.05, vol, pan, null, t);
+          t += 0.09 + Math.random() * 0.07;
+        }
+      },
+      cluck(pan, vol, squawk) {
+        let t = ac.currentTime;
+        const n = squawk ? 1 : 2 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < n; i++) {
+          const f = 430 + Math.random() * 120;
+          tone('triangle', f, f * 0.7, 0.07, vol, pan, filt('bandpass', 1200, 1.5), t);
+          t += 0.12 + Math.random() * 0.05;
+        }
+        if (squawk || Math.random() < 0.4) tone('sawtooth', 620, squawk ? 1100 : 850, squawk ? 0.28 : 0.2, vol * 0.7, pan, filt('bandpass', 1500, 2), t);
+      },
+      moo(pan, vol) {
+        const t0 = ac.currentTime, o = ac.createOscillator(), f = filt('lowpass', 250, 4), g = gain(0);
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(118, t0);
+        o.frequency.linearRampToValueAtTime(132, t0 + 0.35);
+        o.frequency.linearRampToValueAtTime(92, t0 + 1.5);
+        f.frequency.setValueAtTime(220, t0);
+        f.frequency.linearRampToValueAtTime(820, t0 + 0.4);
+        f.frequency.linearRampToValueAtTime(320, t0 + 1.5);
+        chain(o, f, g, panner(pan), master);
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(vol, t0 + 0.15);
+        g.gain.setValueAtTime(vol, t0 + 1.1);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.6);
+        o.start(t0); o.stop(t0 + 1.7);
+      },
+      snort(pan, vol) {
+        burst(0.22, vol, 'bandpass', 650, 0.9, pan);
+        burst(0.16, vol * 0.7, 'bandpass', 500, 0.9, pan, ac.currentTime + 0.18);
+      },
+      bark(pan = 0) {
+        const t = ac.currentTime;
+        for (const dt of [0, 0.2]) {
+          tone('square', 560, 300, 0.1, 0.12, pan, filt('bandpass', 950, 1.2), t + dt);
+          burst(0.06, 0.06, 'bandpass', 1400, 1, pan, t + dt);
+        }
+      },
+      clink() { tone('sine', 2350, 2300, 0.45, 0.12); tone('sine', 3550, 3500, 0.35, 0.07); },
+      coins() { const t = ac.currentTime; for (let i = 0; i < 3; i++) tone('sine', 3000 + i * 400, 2900 + i * 400, 0.12, 0.05, 0, null, t + i * 0.07); },
+      sip() { burst(0.25, 0.08, 'lowpass', 700, 1); tone('sine', 300, 170, 0.12, 0.08, 0, null, ac.currentTime + 0.2); },
+      creak() { tone('sawtooth', 160, 120, 0.3, 0.05, 0, filt('bandpass', 700, 6)); },
+      door() {
+        const t = ac.currentTime;
+        const o = ac.createOscillator(), f = filt('bandpass', 900, 8), g = gain(0);
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(170, t);
+        for (let i = 1; i < 8; i++) o.frequency.linearRampToValueAtTime(150 + Math.random() * 90, t + i * 0.05);
+        chain(o, f, g, master);
+        env(g, t, 0.03, 0.08, 0.4);
+        o.start(t); o.stop(t + 0.5);
+        tone('sine', 90, 50, 0.18, 0.25, 0, null, t + 0.38);
+      },
+      step(surface) {
+        if (surface === 'wood') { tone('sine', 150, 90, 0.07, 0.12); burst(0.04, 0.05, 'lowpass', 500, 1); }
+        else if (surface === 'dirt') burst(0.05, 0.09, 'lowpass', 1100, 0.8);
+        else burst(0.05, 0.035, 'bandpass', 2600, 0.9);
+      },
+      blip() { tone('square', 820, 800, 0.025, 0.018); },
+      crackle(vol) { burst(0.01 + Math.random() * 0.02, vol, 'highpass', 1800 + Math.random() * 2000, 0.7); },
+    };
+    function play(name, ...args) { if (ok()) fx[name](...args); }
+
+    function distSeg(px, py, ax, ay, bx, by) {
+      const dx = bx - ax, dy = by - ay, t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)));
+      const qx = ax + dx * t, qy = ay + dy * t;
+      return [Math.hypot(px - qx, py - qy), qx];
+    }
+    const falloff = (d, r) => Math.pow(Math.max(0, 1 - d / r), 2);
+    const panOf = (x, px) => Math.max(-0.85, Math.min(0.85, (x - px) / 90));
+
+    function update(dt, s) {
+      if (!ac || !master) return;
+      const p = s.p, out = s.map === 'outdoor';
+      // creek
+      let cd = 1e9, cx = p.x;
+      if (out) for (let i = 0; i < CREEK.length - 1; i++) {
+        const [d, qx] = distSeg(p.x, p.y, ...CREEK[i], ...CREEK[i + 1]);
+        if (d < cd) { cd = d; cx = qx; }
+      }
+      // forest band: the stretch of the map between the tavern clearing and the homestead
+      const forest = out ? Math.max(0, Math.min(1, (p.y - FOREST[0]) / 34)) * Math.max(0, Math.min(1, (FOREST[1] - p.y) / 34)) : 0;
+      const creekLvl = out ? Math.pow(Math.max(0, 1 - cd / 130), 1.6) * forest : 0;
+      set(L.creek.gain, creekLvl * 0.6);
+      if (hasPan) set(L.creekPan.pan, panOf(cx, p.x) * 0.6);
+      T.bubble -= dt * 14 * creekLvl;
+      while (T.bubble < 0) { T.bubble += Math.random(); play('bubble', panOf(cx, p.x) + (Math.random() - 0.5) * 0.6, 0.06 * creekLvl); }
+      // forest vs farm
+      const farm = out ? Math.max(0, Math.min(1, (p.y - FOREST[1] + 40) / 80)) : 0;
+      set(L.wind.gain, 0.045 * forest, 0.6);
+      if (out) {
+        T.bird -= dt * (0.25 + 0.9 * forest + 0.35 * farm);
+        if (T.bird < 0) { T.bird = 0.6 + Math.random() * 1.6; play('chirp', (Math.random() - 0.5) * 1.6, 0.03 + Math.random() * 0.04); }
+        for (const c of s.chickens) {
+          c.snd = (c.snd ?? Math.random() * 6) - dt;
+          const d = Math.hypot(c.x - p.x, c.y - p.y), v = falloff(d, 190);
+          if (c.fleeing && !c.squawked) { c.squawked = true; if (v > 0) play('cluck', panOf(c.x, p.x), 0.16 * v, true); }
+          if (!c.fleeing) c.squawked = false;
+          if (c.snd < 0) { c.snd = 3 + Math.random() * 7; if (v > 0) play('cluck', panOf(c.x, p.x), 0.11 * v, false); }
+        }
+        T.moo -= dt;
+        if (T.moo < 0) { T.moo = 14 + Math.random() * 20; const v = falloff(Math.hypot(BARN[0] - p.x, BARN[1] - p.y), 300); if (v > 0) play('moo', panOf(BARN[0], p.x), 0.22 * v); }
+        T.snort -= dt;
+        if (T.snort < 0) { T.snort = 9 + Math.random() * 14; const h = STABLE[Math.floor(Math.random() * 2)]; const v = falloff(Math.hypot(h[0] - p.x, h[1] - p.y), 180); if (v > 0) play('snort', panOf(h[0], p.x), 0.14 * v); }
+      }
+      // tavern: inside it's warm and loud, outside the door you hear it muffled
+      const inside = s.map === 'tavern';
+      const doorLvl = out ? falloff(Math.hypot(TAVERN_DOOR[0] - p.x, TAVERN_DOOR[1] - p.y), 110) : 0;
+      set(L.fire.gain, inside ? 0.35 : 0, 0.4);
+      set(L.murmur.gain, inside ? 0.5 : doorLvl * 0.35, 0.4);
+      set(L.murmurOut.frequency, inside ? 4000 : 650, 0.2);
+      if (inside || doorLvl > 0) {
+        T.murmur -= dt;
+        if (T.murmur < 0) {
+          T.murmur = 0.09 + Math.random() * 0.16;
+          L.formants.forEach((g, i) => set(g.gain, Math.random() < 0.3 ? 0.02 : (0.15 + Math.random() * 0.5) / (i + 1), 0.04));
+        }
+      }
+      if (inside) {
+        T.crackle -= dt * 7;
+        while (T.crackle < 0) { T.crackle += Math.random(); play('crackle', 0.03 + Math.random() * 0.09); }
+      }
+    }
+    function setMuted(m) {
+      muted = m;
+      try { localStorage.setItem('concord-muted', m ? '1' : '0'); } catch (e) { /* storage unavailable */ }
+      if (master) set(master.gain, m ? 0 : 0.85, 0.05);
+    }
+    document.addEventListener('visibilitychange', () => { if (!ac) return; if (document.hidden) ac.suspend(); else ac.resume(); });
+    return { start, update, play, setMuted, get muted() { return muted; }, inBridge: (x, y) => x >= BRIDGE[0] && x < BRIDGE[2] && y >= BRIDGE[1] && y < BRIDGE[3] };
+  })();
+
+  // ------------------------------------------------------------------ dom
+  const $ = (id) => document.getElementById(id);
+  const cvs = $('c'), ctx = cvs.getContext('2d');
+  const touchUI = matchMedia('(pointer: coarse)').matches;
+  if (touchUI) {
+    $('keys').innerHTML = 'TOUCH AND DRAG TO WALK<br>TAP A TO TALK, LOOK AND SIT';
+  }
+
+  const S = {
+    W: null, img: {}, maps: {}, map: 'outdoor', ready: false, started: false,
+    p: { x: 0, y: 0, dir: 'down', frame: 0, anim: 0, moving: false, seat: null },
+    dog: { x: 0, y: 0, dir: 'down', frame: 0, anim: 0, waiting: null, stuck: 0 },
+    trail: [], keys: new Set(), stick: null, chickens: [], puffs: [], smokeT: 0,
+    pence: 30, ale: 0, emptyMug: false, talkIdx: {}, quest: 0, holtNag: false,
+    dialog: null, fade: 0, fadeDir: 0, pending: null, target: null,
+    region: '', toastT: 0, scale: 2, view: [320, 200], time: 0,
+  };
+
+  const loadImg = (src) => new Promise((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = () => rej(new Error('Could not load ' + src));
+    i.src = BASE + src;
+  });
+  function maskOf(img, w, h) {
+    const oc = document.createElement('canvas');
+    oc.width = w; oc.height = h;
+    const ox = oc.getContext('2d');
+    ox.drawImage(img, 0, 0);
+    const px = ox.getImageData(0, 0, w, h).data;
+    const m = new Uint8Array(w * h);
+    for (let i = 0; i < m.length; i++) m[i] = px[i * 4 + 3] > 0 ? 1 : 0;
+    return m;
+  }
+
+  async function load(snap) {
+    const W = await fetch(BASE + 'world.json').then((r) => { if (!r.ok) throw new Error('Could not load the world'); return r.json(); });
+    S.W = W;
+    const names = ['objects', 'player', 'people', 'dog', 'chicken'];
+    const imgs = await Promise.all(names.map((n) => loadImg(n + '.png')));
+    names.forEach((n, i) => (S.img[n] = imgs[i]));
+    for (const [key, m] of Object.entries(W.maps)) {
+      const [ground, col] = await Promise.all([loadImg(key + '.png'), loadImg(key + '_collide.png')]);
+      const gc = document.createElement('canvas');
+      gc.width = m.w; gc.height = m.h;
+      const gx = gc.getContext('2d');
+      gx.drawImage(ground, 0, 0);
+      S.maps[key] = Object.assign({}, m, {
+        ground, block: maskOf(col, m.w, m.h), groundPx: gx.getImageData(0, 0, m.w, m.h).data,
+        objs: m.objects.map((o) => ({ sx: o[0], sy: o[1], w: o[2], h: o[3], x: o[4], y: o[5], z: o[6] })),
+        npcs: m.npcs.map((n) => Object.assign({ home: n.dir }, n)),
+      });
+    }
+    const st = (snap && snap.map) ? snap : W.start;
+    S.map = st.map; S.p.x = st.x; S.p.y = st.y; S.p.dir = st.dir || 'down';
+    if (snap && typeof snap.pence === 'number') { S.pence = snap.pence; S.ale = snap.ale || 0; }
+    setQuest((snap && snap.quest) || 0, false);
+    S.dog.x = S.p.x + 14; S.dog.y = S.p.y + 2;
+    if (S.map !== 'outdoor') { const d = S.maps.tavern.doors[0].spawn; S.dog.waiting = [d[0] + 14, d[1] + 4]; S.dog.x = S.dog.waiting[0]; S.dog.y = S.dog.waiting[1]; }
+    const snd = W.maps.outdoor.sound;
+    CREEK = snd.creek; BRIDGE = snd.bridge; BARN = snd.barn; STABLE = snd.stable; TAVERN_DOOR = snd.door; FOREST = snd.forest;
+    S.chickens = S.maps.outdoor.chickens.map(([x, y]) => ({ x, y, vx: 0, vy: 0, t: Math.random() * 2, face: 1, bob: 0, home: [x, y] }));
+    updatePurse();
+    S.ready = true;
+  }
+
+  // ------------------------------------------------------------------ collision
+  const M = () => S.maps[S.map];
+  function solid(x, y) {
+    const m = M();
+    x |= 0; y |= 0;
+    if (x < 4 || y < 4 || x >= m.w - 4 || y >= m.h - 2) return true;
+    return m.block[y * m.w + x] === 1;
+  }
+  function boxHit(x, y, hw, hh) {
+    for (let yy = Math.floor(y - hh); yy <= Math.floor(y); yy++)
+      for (let xx = Math.floor(x - hw); xx <= Math.floor(x + hw); xx++)
+        if (solid(xx, yy)) return true;
+    return false;
+  }
+  function tryMove(e, dx, dy, hw, hh) {
+    let moved = false;
+    if (dx) {
+      if (!boxHit(e.x + dx, e.y, hw, hh)) { e.x += dx; moved = true; }
+      else if (!dy) for (const n of [1, -1, 2, -2, 3, -3, 4, -4]) if (!boxHit(e.x + dx, e.y + n, hw, hh)) { e.y += Math.sign(n) * Math.min(Math.abs(dx), 1); moved = true; break; }
+    }
+    if (dy) {
+      if (!boxHit(e.x, e.y + dy, hw, hh)) { e.y += dy; moved = true; }
+      else if (!dx) for (const n of [1, -1, 2, -2, 3, -3, 4, -4]) if (!boxHit(e.x + n, e.y + dy, hw, hh)) { e.x += Math.sign(n) * Math.min(Math.abs(dy), 1); moved = true; break; }
+    }
+    return moved;
+  }
+
+  // ------------------------------------------------------------------ input
+  const KEYMAP = { ArrowUp: 'u', KeyW: 'u', ArrowDown: 'd', KeyS: 'd', ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ShiftLeft: 'run', ShiftRight: 'run' };
+  addEventListener('keydown', (e) => {
+    const k = KEYMAP[e.code];
+    const act = e.code === 'KeyE' || e.code === 'Space' || e.code === 'Enter';
+    if (!S.started) { if (k || act) { begin(); e.preventDefault(); } return; }
+    if (e.code === 'KeyM') { toggleSound(); return; }
+    if (act) { e.preventDefault(); if (!e.repeat) pressA(); return; }
+    if (k) { S.keys.add(k); e.preventDefault(); }
+  });
+  addEventListener('keyup', (e) => { const k = KEYMAP[e.code]; if (k) S.keys.delete(k); });
+  addEventListener('blur', () => S.keys.clear());
+  $('dialog').addEventListener('click', () => pressA());
+  $('abtn').addEventListener('click', (e) => { e.stopPropagation(); pressA(); });
+
+  cvs.addEventListener('pointerdown', (e) => {
+    if (!S.started || e.pointerType === 'mouse') return;
+    if (S.dialog) { pressA(); return; }
+    S.stick = { id: e.pointerId, ox: e.clientX, oy: e.clientY, dx: 0, dy: 0 };
+    const st = $('stick');
+    st.hidden = false; st.style.left = e.clientX + 'px'; st.style.top = e.clientY + 'px';
+    st.firstChild.style.transform = 'translate(0px, 0px)';
+    cvs.setPointerCapture(e.pointerId);
+  });
+  cvs.addEventListener('pointermove', (e) => {
+    if (!S.stick || e.pointerId !== S.stick.id) return;
+    let dx = e.clientX - S.stick.ox, dy = e.clientY - S.stick.oy;
+    const m = Math.hypot(dx, dy), max = 36;
+    if (m > max) { dx *= max / m; dy *= max / m; }
+    S.stick.dx = dx / max; S.stick.dy = dy / max;
+    $('stick').firstChild.style.transform = `translate(${dx}px, ${dy}px)`;
+  });
+  const endStick = (e) => { if (S.stick && e.pointerId === S.stick.id) { S.stick = null; $('stick').hidden = true; } };
+  cvs.addEventListener('pointerup', endStick);
+  cvs.addEventListener('pointercancel', endStick);
+
+  function begin() {
+    if (S.started || !S.ready) return;
+    S.started = true;
+    AUD.start();
+    $('title').hidden = true;
+    if (touchUI) $('abtn').hidden = false;
+    toast(REGIONS[S.map].find(r => inR(S.p, r.slice(1)))?.[0] || 'THE HOMESTEAD');
+  }
+  $('start').addEventListener('click', begin);
+  function toggleSound() {
+    AUD.setMuted(!AUD.muted);
+    if (!AUD.muted) AUD.start();
+    $('snd').textContent = AUD.muted ? 'SOUND OFF' : 'SOUND ON';
+    $('snd').setAttribute('aria-pressed', String(!AUD.muted));
+  }
+  $('snd').addEventListener('click', (e) => { e.stopPropagation(); toggleSound(); e.currentTarget.blur(); });
+  $('snd').textContent = AUD.muted ? 'SOUND OFF' : 'SOUND ON';
+  $('snd').setAttribute('aria-pressed', String(!AUD.muted));
+
+  // ------------------------------------------------------------------ dialog
+  function say(lines, onDone) {
+    // lines: array of [speakerName|null, text]
+    S.dialog = { lines, i: 0, shown: 0, onDone };
+    S.keys.clear();
+    $('dialog').hidden = false;
+    document.body.classList.add('talking');
+    renderDialog();
+  }
+  function renderDialog() {
+    const d = S.dialog, [name, text, style] = d.lines[d.i];
+    $('dialog').classList.toggle('note', style === 'note');
+    $('dname').textContent = name || '';
+    $('dname').hidden = !name;
+    $('dtext').textContent = text.slice(0, Math.floor(d.shown));
+    $('dmore').hidden = d.shown < text.length;
+  }
+  function advance() {
+    const d = S.dialog, text = d.lines[d.i][1];
+    if (d.shown < text.length) { d.shown = text.length; renderDialog(); return; }
+    d.i++; d.shown = 0;
+    if (d.i >= d.lines.length) { S.dialog = null; $('dialog').hidden = true; document.body.classList.remove('talking'); d.onDone && d.onDone(); return; }
+    renderDialog();
+  }
+  function nextLine(id) {
+    const t = TALK[id];
+    const i = S.talkIdx[id] || 0;
+    S.talkIdx[id] = (i + 1) % Math.max(1, t.lines.length);
+    const out = t.lines[i].map((txt) => [t.name, txt]);
+    const n = NOTES[id + ':' + i] || NOTES[id];
+    if (n) out.push(note(n));
+    return out;
+  }
+
+  // ------------------------------------------------------------------ interaction
+  function inR(pt, r) { return pt.x >= r[0] && pt.x < r[2] && pt.y >= r[1] && pt.y < r[3]; }
+  function probe() {
+    const p = S.p, o = { down: [0, 7], up: [0, -12], left: [-11, -3], right: [11, -3] }[p.dir];
+    return { x: p.x + o[0], y: p.y + o[1] };
+  }
+  function findTarget() {
+    const m = M(), p = S.p;
+    if (p.seat !== null) {
+      const seat = m.seats[p.seat];
+      let best = null, bd = 30;
+      for (const n of m.npcs) if (n.seated) { const d = Math.hypot(n.x - seat.x, n.y - seat.y); if (d < bd) { bd = d; best = n; } }
+      if (best) return { kind: 'npc', npc: best, label: S.ale ? 'TALK & SIP' : 'TALK', ax: best.x, ay: best.y - 26 };
+      if (S.ale) return { kind: 'drink', label: 'DRINK', ax: seat.x, ay: seat.y - 26 };
+      return null;
+    }
+    const q = probe();
+    for (const n of m.npcs) {
+      if (n.seated) continue;
+      if (q.x > n.x - 9 && q.x < n.x + 9 && q.y > n.y - 18 && q.y < n.y + 4) return { kind: 'npc', npc: n, label: 'TALK', ax: n.x, ay: n.y - 28 };
+    }
+    if (S.map === 'outdoor' && !S.dog.waiting) {
+      const d = S.dog;
+      if (q.x > d.x - 9 && q.x < d.x + 9 && q.y > d.y - 12 && q.y < d.y + 4) return { kind: 'act', id: 'dog', label: 'PET', ax: d.x, ay: d.y - 14 };
+    }
+    for (const a of m.acts) {
+      if (inR(q, a.r)) {
+        if (a.id === 'tavern_door') continue;
+        return { kind: 'act', id: a.id, label: a.label, ax: (a.r[0] + a.r[2]) / 2, ay: a.r[1] - 4 };
+      }
+    }
+    return null;
+  }
+  function faceToward(n) {
+    if (n.seated || n.id === 'keeper') return;
+    const dx = S.p.x - n.x, dy = S.p.y - n.y;
+    n.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
+  }
+  function sip(lines) {
+    if (!S.ale) return lines;
+    S.ale--;
+    setTimeout(() => AUD.play('sip'), 150);
+    if (S.ale === 0) { S.emptyMug = true; return lines.concat([[null, 'You drain the last of your ale. The mug is empty.']]); }
+    return lines.concat([[null, ['You take a sip of ale. Cool, bitter and very welcome.', 'You take a long pull of ale.', 'You sip your ale and listen to the fire.'][S.ale % 3]]]);
+  }
+  // ------------------------------------------------------------------ the wheat mystery
+  // Stage 0: nothing noticed. 1: the wheat is failing, ask at the tavern. 2: Ezra blames the barberry. 3: Hannah agrees, task done.
+  const QUEST = [
+    null,
+    'Find out what is ailing the wheat. Someone at the Plough & Harrow may know.',
+    'Ezra blames the barberry hedge. Go home and tell Hannah.',
+    'The barberry hedge comes out before spring planting.',
+  ];
+  function setQuest(stage, announce = true) {
+    S.quest = stage;
+    const q = $('quest');
+    if (!QUEST[stage]) { q.hidden = true; return; }
+    q.hidden = false; q.classList.remove('fade');
+    $('qlabel').textContent = stage === 3 ? 'TASK COMPLETE' : 'TASK';
+    $('qtext').textContent = QUEST[stage];
+    if (announce) toast(stage === 3 ? 'TASK COMPLETE' : 'NEW TASK');
+    clearTimeout(setQuest.t);
+    if (stage === 3) setQuest.t = setTimeout(() => q.classList.add('fade'), 7000);
+  }
+  const SPECIAL = {
+    wheat() {
+      if (S.quest === 0) {
+        return { lines: [[null, 'Your winter wheat should stand heavy and gold by now. Instead the stalks are streaked with rusty orange, and the heads are thin and shriveled.'],
+          ['YOU', 'Third year running. Father never had this trouble. What in heaven is wrong with it?']], then: () => setQuest(1) };
+      }
+      if (S.quest === 1) return { lines: [[null, 'The rust is worst along the west edge of the field, by the hedge, and thins out toward the east.'], ['YOU', 'Someone at the Plough & Harrow might know what ails it.']] };
+      return { lines: [[null, 'The rust is worst right beside the barberry hedge, just as Ezra said.'], note(NOTES.wheat_rust)] };
+    },
+    barberry() {
+      if (S.quest < 2) return { lines: [[null, 'A thick hedge of barberry your father planted as a windbreak. Hannah makes a tart red jelly from the berries.'], note(NOTES.barberry)] };
+      return { lines: [[null, 'The berries hang thick and red. Hard to believe something so pretty is ruining the wheat.'], ['YOU', 'This hedge comes out before spring planting.'], note(NOTES.barberry_after)] };
+    },
+    wife() {
+      if (S.quest === 0) {
+        return { lines: [['HANNAH', 'Have you looked at the wheat? It\'s gone rusty again, and the heads are near empty.'],
+          ['HANNAH', 'Ask about at the tavern. Ezra Holt has farmed forty years. If anyone knows what ails it, he does.']], then: () => setQuest(1) };
+      }
+      if (S.quest === 1) return { lines: [['HANNAH', 'Off to the tavern, then? Ask Ezra about the wheat.']] };
+      if (S.quest === 2) {
+        return { lines: [['HANNAH', 'Well? What did they say at the tavern?'],
+          ['YOU', 'Ezra says it\'s the barberry. Wherever it grows, the wheat takes the rust.'],
+          ['HANNAH', 'My barberry? I make my jelly from those berries!'],
+          ['HANNAH', '...Well. I\'d sooner have bread than jelly. If it must come out, it must.']], then: () => setQuest(3) };
+      }
+      return null;
+    },
+    holt() {
+      if (S.quest === 1) {
+        return { lines: [
+          ['YOU', 'Ezra, you\'ve farmed longer than anyone. My wheat\'s come up rusty again. Orange streaks on the stalks, the heads all shriveled.'],
+          ['EZRA HOLT', 'The blast, is it? Tell me, have you barberry growing near that field?'],
+          ['YOU', 'A hedge my father planted, right along the edge. Hannah makes jelly from it.'],
+          ['EZRA HOLT', 'There\'s your trouble. Wherever barberry grows, the wheat takes the rust. My father pulled every bush on our place, and his wheat came back.'],
+          ['EZRA HOLT', 'The General Court even passed a law against it, back in \'55. No one rightly knows why it happens. But it does.'],
+          ['YOU', 'Hannah won\'t like it. But better bread than jelly.'],
+          note(NOTES.wheat_law)], then: () => setQuest(2) };
+      }
+      if (S.quest === 2 && !S.holtNag) { S.holtNag = true; return { lines: [['EZRA HOLT', 'Pull up every root of that barberry, mind. Leave one and it\'ll come right back.']] }; }
+      return null;
+    },
+  };
+  function linesFor(id) {
+    const sp = SPECIAL[id] && SPECIAL[id]();
+    if (sp) return sp;
+    return TALK[id] ? { lines: nextLine(id) } : null;
+  }
+
+  function pressA() {
+    if (!S.started || S.fadeDir) return;
+    if (S.dialog) { advance(); return; }
+    const t = S.target;
+    if (!t) return;
+    if (t.kind === 'drink') { say(sip([])); return; }
+    if (t.kind === 'npc') {
+      const n = t.npc;
+      faceToward(n);
+      if (n.id === 'keeper') return keeper();
+      const r = linesFor(n.id);
+      if (!r) return;
+      let lines = r.lines;
+      if (S.p.seat !== null) lines = sip(lines);
+      say(lines, () => { n.dir = n.home; r.then && r.then(); });
+      return;
+    }
+    if (t.id.startsWith('seat:')) { AUD.play('creak'); return sit(+t.id.slice(5)); }
+    if (t.id === 'dog') AUD.play('bark', Math.max(-0.8, Math.min(0.8, (S.dog.x - S.p.x) / 40)));
+    if (t.id === 'keeper') return keeper();
+    const r = linesFor(t.id);
+    if (!r) return;
+    say(r.lines, () => { const n = M().npcs.find((q) => q.id === t.id); if (n) n.dir = n.home; r.then && r.then(); });
+  }
+  function keeper() {
+    if (S.ale) return say([[KEEPER, 'You\'ve still ale in that mug, friend. Drink up first!']]);
+    if (S.pence < ALE_COST) return say([[KEEPER, 'Your purse is light tonight, neighbor. Come back after market day.']]);
+    say([[KEEPER, 'Evening, neighbor! Ale\'s tuppence a mug.'], [null, 'You set two pennies on the bar.'],
+         [KEEPER, 'There you are. Find yourself a seat. Ezra and Silas are at it again.'], note(NOTES.keeper)], () => {
+      S.pence -= ALE_COST; S.ale = 4; S.emptyMug = false; updatePurse();
+      AUD.play('coins'); setTimeout(() => AUD.play('clink'), 250);
+    });
+  }
+  function sit(i) {
+    const seat = M().seats[i];
+    S.p.seat = i; S.p.x = seat.x; S.p.y = seat.y; S.p.dir = 'down'; S.p.moving = false;
+    if (S.emptyMug && !S.ale) S.emptyMug = false;
+  }
+  function standUp(dir) {
+    const seat = M().seats[S.p.seat];
+    S.p.seat = null; S.p.x = seat.stand[0]; S.p.y = seat.stand[1]; S.p.dir = dir === 'down' ? 'up' : dir;
+    S.emptyMug = false;
+  }
+  function updatePurse() {
+    const s = Math.floor(S.pence / 12), d = S.pence % 12;
+    $('coins').textContent = (s ? s + 's ' : '') + d + 'd' + (S.ale ? ' \u00b7 ALE' : '');
+  }
+  function toast(t) { $('toast').textContent = t; $('toast').classList.add('on'); S.toastT = 2.4; }
+
+  // ------------------------------------------------------------------ maps & doors
+  function goTo(door) {
+    AUD.play('door');
+    S.fadeDir = 1;
+    S.pending = door;
+  }
+  function arrive(door) {
+    const from = S.map;
+    S.map = door.to;
+    S.p.x = door.spawn[0]; S.p.y = door.spawn[1]; S.p.dir = door.to === 'tavern' ? 'up' : 'down'; S.p.seat = null;
+    S.trail = [];
+    if (door.to === 'tavern') { S.dog.waiting = [door.spawn ? S.maps.tavern.doors[0].spawn[0] + 14 : 0, S.maps.tavern.doors[0].spawn[1] + 4]; S.dog.x = S.dog.waiting[0]; S.dog.y = S.dog.waiting[1]; S.dog.dir = 'down'; }
+    else { S.dog.waiting = null; }
+    S.region = '';
+    if (from !== door.to && door.to === 'tavern') toast('THE PLOUGH & HARROW');
+  }
+
+  // ------------------------------------------------------------------ update
+  function update(dt) {
+    S.time += dt;
+    // fades
+    if (S.fadeDir) {
+      S.fade += S.fadeDir * dt * 4;
+      if (S.fadeDir > 0 && S.fade >= 1) { S.fade = 1; arrive(S.pending); S.pending = null; S.fadeDir = -1; }
+      else if (S.fadeDir < 0 && S.fade <= 0) { S.fade = 0; S.fadeDir = 0; }
+      $('fade').style.opacity = S.fade;
+    }
+    if (S.dialog) {
+      const d = S.dialog;
+      const len = d.lines[d.i][1].length;
+      if (d.shown < len) {
+        const before = Math.floor(d.shown / 3);
+        d.shown = Math.min(len, d.shown + dt * 55); renderDialog();
+        if (Math.floor(d.shown / 3) > before && d.lines[d.i][1][Math.floor(d.shown) - 1] !== ' ') AUD.play('blip');
+      }
+    }
+    const p = S.p;
+    let ix = 0, iy = 0, run = S.keys.has('run');
+    if (S.keys.has('l')) ix -= 1;
+    if (S.keys.has('r')) ix += 1;
+    if (S.keys.has('u')) iy -= 1;
+    if (S.keys.has('d')) iy += 1;
+    if (S.stick) { const m = Math.hypot(S.stick.dx, S.stick.dy); if (m > 0.25) { ix = S.stick.dx; iy = S.stick.dy; run = m > 0.92; } }
+    const busy = !S.started || S.dialog || S.fadeDir;
+    const mag = Math.hypot(ix, iy);
+    p.moving = false;
+    if (!busy && mag > 0) {
+      ix /= Math.max(1, mag); iy /= Math.max(1, mag);
+      const dir = Math.abs(ix) > Math.abs(iy) + 0.01 ? (ix < 0 ? 'left' : 'right') : (iy < 0 ? 'up' : 'down');
+      if (p.seat !== null) { standUp(dir); }
+      p.dir = dir;
+      const sp = (run ? 112 : 66) * dt;
+      const e = { x: p.x, y: p.y }, steps = Math.ceil(Math.max(Math.abs(ix * sp), Math.abs(iy * sp)));
+      for (let i = 0; i < steps; i++) tryMove(e, ix * sp / steps, iy * sp / steps, 5, 4);
+      p.moving = Math.hypot(e.x - p.x, e.y - p.y) > 0.01;
+      p.x = e.x; p.y = e.y;
+      p.anim += dt * (run ? 13 : 8.5);
+      if (p.moving) { S.trail.push([p.x, p.y, p.dir]); if (S.trail.length > 90) S.trail.shift(); }
+      // doors
+      for (const d of M().doors) if (inR(p, d.r) && dir === d.dir) { goTo(d); break; }
+      // walking into the tavern door rectangle from below
+    } else p.anim = 0;
+    const nf = p.moving ? [0, 1, 0, 2][Math.floor(p.anim) % 4] : 0;
+    if (p.moving && nf !== p.frame && nf !== 0) AUD.play('step', surfaceAt(p.x, p.y));
+    p.frame = nf;
+    AUD.update(dt, S);
+
+    if (S.map === 'outdoor') { updateDog(dt, run); updateChickens(dt); }
+    updateSmoke(dt);
+
+    // target + hint
+    S.target = busy ? null : findTarget();
+    const hint = $('hint');
+    if (S.target) { hint.innerHTML = (touchUI ? '<b>A</b> ' : '<b>E</b> ') + S.target.label; hint.classList.remove('off'); }
+    else if (p.seat !== null && !busy) { hint.innerHTML = 'WALK TO STAND UP'; hint.classList.remove('off'); }
+    else hint.classList.add('off');
+
+    // region toast
+    let here = '';
+    for (const [name, x0, y0, x1, y1] of REGIONS[S.map]) if (p.x >= x0 && p.x < x1 && p.y >= y0 && p.y < y1) { here = name; break; }
+    if (here && here !== S.region && S.started && S.map === 'outdoor') toast(here);
+    if (here) S.region = here;
+    if (S.toastT > 0) { S.toastT -= dt; if (S.toastT <= 0) $('toast').classList.remove('on'); }
+  }
+
+  function surfaceAt(x, y) {
+    if (S.map === 'tavern' || AUD.inBridge(x, y)) return 'wood';
+    const m = M(), i = ((y | 0) * m.w + (x | 0)) * 4, px = m.groundPx;
+    return px[i] > px[i + 1] ? 'dirt' : 'grass';
+  }
+  function updateDog(dt, run) {
+    const d = S.dog, p = S.p;
+    if (d.waiting) { d.moving = false; d.frame = 0; return; }
+    const dist = Math.hypot(p.x - d.x, p.y - d.y);
+    let tx = null, ty = null;
+    if (dist > 22) {
+      const back = S.trail[Math.max(0, S.trail.length - 14)];
+      if (back) { tx = back[0]; ty = back[1]; } else { tx = p.x; ty = p.y; }
+    }
+    d.moving = false;
+    if (tx !== null) {
+      const dx = tx - d.x, dy = ty - d.y, m = Math.hypot(dx, dy);
+      if (m > 1) {
+        const sp = Math.min(m, (dist > 60 ? 130 : (run ? 115 : 70)) * dt);
+        const e = { x: d.x, y: d.y };
+        const ok = tryMove(e, dx / m * sp, 0, 4, 3) | tryMove(e, 0, dy / m * sp, 4, 3);
+        d.moving = Math.hypot(e.x - d.x, e.y - d.y) > 0.01;
+        d.x = e.x; d.y = e.y;
+        d.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : (dy < 0 ? 'up' : 'down');
+        d.stuck = d.moving ? 0 : d.stuck + dt;
+      }
+    } else if (dist < 30) {
+      d.dir = Math.abs(p.x - d.x) > Math.abs(p.y - d.y) ? (p.x < d.x ? 'left' : 'right') : (p.y < d.y ? 'up' : 'down');
+      d.stuck = 0;
+    }
+    if (d.stuck > 1.2 && dist > 40) { const b = S.trail[Math.max(0, S.trail.length - 8)] || [p.x, p.y]; d.x = b[0]; d.y = b[1]; d.stuck = 0; }
+    d.anim = d.moving ? d.anim + dt * 12 : 0;
+    d.frame = d.moving ? [0, 1, 0, 2][Math.floor(d.anim) % 4] : 0;
+  }
+
+  function updateChickens(dt) {
+    for (const c of S.chickens) {
+      c.t -= dt;
+      const dx = c.x - S.p.x, dy = c.y - S.p.y, dp = Math.hypot(dx, dy);
+      const ddx = c.x - S.dog.x, ddy = c.y - S.dog.y, dd = Math.hypot(ddx, ddy);
+      c.fleeing = dp < 22 || dd < 18;
+      if (c.fleeing) {
+        const [ax, ay, a] = dp < dd ? [dx, dy, dp] : [ddx, ddy, dd];
+        c.vx = ax / (a || 1) * 46; c.vy = ay / (a || 1) * 46; c.t = 0.5;
+      } else if (c.t <= 0) {
+        if (Math.random() < 0.45) { c.vx = 0; c.vy = 0; }
+        else { const a = Math.random() * 6.283; c.vx = Math.cos(a) * 12 + (c.home[0] - c.x) * 0.2; c.vy = Math.sin(a) * 12 + (c.home[1] - c.y) * 0.2; }
+        c.t = 0.8 + Math.random() * 1.8;
+      }
+      if (c.vx || c.vy) {
+        const e = { x: c.x, y: c.y };
+        if (!tryMove(e, c.vx * dt, 0, 2, 2)) c.vx = -c.vx;
+        if (!tryMove(e, 0, c.vy * dt, 2, 2)) c.vy = -c.vy;
+        c.x = e.x; c.y = e.y;
+        if (Math.abs(c.vx) > 1) c.face = c.vx > 0 ? -1 : 1;
+        c.bob = (c.bob + dt * 10) % 2;
+      } else if (Math.random() < dt * 1.5) c.bob = 1 - Math.floor(c.bob);
+    }
+  }
+
+  function updateSmoke(dt) {
+    const m = M();
+    S.smokeT -= dt;
+    if (S.smokeT <= 0 && m.smoke.length) {
+      S.smokeT = 0.42;
+      for (const [x, y] of m.smoke) S.puffs.push({ map: S.map, x: x + Math.random() * 2 - 1, y, age: 0, life: 3 + Math.random(), vx: 2 + Math.random() * 3 });
+    }
+    for (const f of S.puffs) { f.age += dt; f.x += f.vx * dt; f.y -= 7.5 * dt; }
+    S.puffs = S.puffs.filter((f) => f.age < f.life && f.map === S.map);
+  }
+
+  // ------------------------------------------------------------------ render
+  function resize() {
+    const dpr = window.devicePixelRatio || 1, W = innerWidth, H = innerHeight;
+    const cssScale = Math.max(2, Math.floor(Math.min(W / 300, H / 190)));
+    S.scale = Math.max(1, Math.round(cssScale * dpr));
+    cvs.width = Math.round(W * dpr); cvs.height = Math.round(H * dpr);
+    S.view = [cvs.width / S.scale, cvs.height / S.scale];
+  }
+  addEventListener('resize', resize);
+  resize();
+
+  function pxCircle(x, y, r) {
+    for (let dy = -r; dy <= r; dy++) {
+      const w = Math.floor(Math.sqrt(r * r - dy * dy + 0.5));
+      ctx.fillRect(x - w, y + dy, w * 2 + 1, 1);
+    }
+  }
+  function shadow(x, y, w) {
+    ctx.fillStyle = 'rgba(16, 30, 24, 0.34)';
+    ctx.fillRect(x - w / 2 + 1, y - 1, w - 2, 1);
+    ctx.fillRect(x - w / 2, y, w, 1);
+    ctx.fillRect(x - w / 2 + 1, y + 1, w - 2, 1);
+  }
+  const ROW = { down: 0, left: 1, right: 2, up: 3 };
+
+  function drawFire(fx, fy) {
+    ctx.fillStyle = '#5a3a26'; ctx.fillRect(fx - 10, fy - 3, 20, 3);
+    ctx.fillStyle = '#3c261c'; ctx.fillRect(fx - 8, fy - 5, 16, 2);
+    const t = Math.floor(S.time * 12);
+    for (let i = -4; i <= 4; i++) {
+      const h = 5 + ((Math.sin(t * 1.7 + i * 2.3) + 1) * 3.5) + (i === 0 ? 4 : 0) - Math.abs(i);
+      if (h <= 1) continue;
+      const x = fx + i * 2;
+      ctx.fillStyle = '#c8381e'; ctx.fillRect(x - 1, fy - 4 - h, 3, h);
+      ctx.fillStyle = '#f08c28'; ctx.fillRect(x, fy - 4 - h * 0.75, 2, h * 0.75);
+      ctx.fillStyle = '#ffe070'; ctx.fillRect(x, fy - 4 - h * 0.4, 1, h * 0.4);
+    }
+    if ((t % 7) === 0) { ctx.fillStyle = '#ffd060'; ctx.fillRect(fx - 3 + (t % 5), fy - 18 - (t % 4), 1, 1); }
+  }
+
+  function render() {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#0d0c14';
+    ctx.fillRect(0, 0, cvs.width, cvs.height);
+    if (!S.ready) return;
+    const m = M(), sc = S.scale, [vw, vh] = S.view, p = S.p;
+    let cx = p.x - vw / 2, cy = p.y - 12 - vh / 2;
+    cx = vw >= m.w ? (m.w - vw) / 2 : Math.min(Math.max(0, cx), m.w - vw);
+    cy = vh >= m.h ? (m.h - vh) / 2 : Math.min(Math.max(0, cy), m.h - vh);
+    cx = Math.round(cx); cy = Math.round(cy);
+    ctx.imageSmoothingEnabled = false;
+    ctx.setTransform(sc, 0, 0, sc, -cx * sc, -cy * sc);
+    ctx.drawImage(m.ground, 0, 0);
+    if (m.fire) drawFire(m.fire[0], m.fire[1]);
+
+    const [fw, fh] = S.W.frame, [dw, dh] = S.W.dog, [cw, chh] = S.W.chicken;
+    const list = [];
+    for (const o of m.objs) if (!(o.x + o.w < cx || o.x > cx + vw || o.y + o.h < cy || o.y > cy + vh)) list.push(o);
+    const px = Math.round(p.x), py = Math.round(p.y);
+    const seat = p.seat !== null ? m.seats[p.seat] : null;
+    list.push({ z: py + 0.5, kind: 'player' });
+    if (seat && (S.ale || S.emptyMug)) list.push({ z: seat.z + 0.5, kind: 'mug', x: seat.mug[0], y: seat.mug[1] });
+    for (const n of m.npcs) list.push({ z: n.y + 0.3, kind: 'npc', n });
+    if (S.map === 'outdoor') {
+      list.push({ z: Math.round(S.dog.y) + 0.2, kind: 'dog' });
+      for (const c of S.chickens) list.push({ z: Math.round(c.y) + 0.4, kind: 'chick', c });
+    }
+    list.sort((a, b) => a.z - b.z);
+    for (const o of list) {
+      if (o.kind === 'player') {
+        if (!seat) shadow(px, py, 12);
+        const yo = seat ? 3 : 0;
+        ctx.drawImage(S.img.player, p.frame * fw, ROW[p.dir] * fh, fw, fh, px - Math.floor(fw / 2), py - fh + 2 + yo, fw, fh);
+      } else if (o.kind === 'npc') {
+        const n = o.n;
+        if (!n.seated) shadow(n.x, n.y, 12);
+        ctx.drawImage(S.img.people, ROW[n.dir] * fw, n.row * fh, fw, fh, n.x - Math.floor(fw / 2), n.y - fh + 2 + (n.seated ? 3 : 0), fw, fh);
+      } else if (o.kind === 'dog') {
+        const d = S.dog, x = Math.round(d.x), y = Math.round(d.y);
+        shadow(x, y, 10);
+        ctx.drawImage(S.img.dog, d.frame * dw, ROW[d.dir] * dh, dw, dh, x - dw / 2, y - dh + 1, dw, dh);
+      } else if (o.kind === 'chick') {
+        const c = o.c, x = Math.round(c.x), y = Math.round(c.y);
+        shadow(x, y, 6);
+        ctx.save();
+        if (c.face < 0) { ctx.translate(x * 2, 0); ctx.scale(-1, 1); }
+        ctx.drawImage(S.img.chicken, (Math.floor(c.bob) % 2) * cw, 0, cw, chh, x - Math.floor(cw / 2), y - chh + 1, cw, chh);
+        ctx.restore();
+      } else if (o.kind === 'mug') {
+        const g = S.ale ? S.W.mug : S.W.mugEmpty;
+        ctx.drawImage(S.img.objects, g[0], g[1], g[2], g[3], o.x, o.y, g[2], g[3]);
+      } else {
+        ctx.drawImage(S.img.objects, o.sx, o.sy, o.w, o.h, o.x, o.y, o.w, o.h);
+      }
+    }
+    // chimney smoke
+    for (const f of S.puffs) {
+      const k = f.age / f.life, r = Math.round(1 + k * 4), x = Math.round(f.x), y = Math.round(f.y);
+      ctx.globalAlpha = 0.8 * (1 - k);
+      ctx.fillStyle = '#b8b8c4'; pxCircle(x, y, r);
+      ctx.fillStyle = '#f2f2f0'; pxCircle(x - Math.ceil(r / 3), y - Math.ceil(r / 3), Math.max(0, r - 1));
+    }
+    ctx.globalAlpha = 1;
+    // fire glow indoors
+    if (m.fire) {
+      const fl = 0.16 + Math.sin(S.time * 9) * 0.02 + Math.sin(S.time * 23) * 0.015;
+      const g = ctx.createRadialGradient(m.fire[0], m.fire[1] - 8, 4, m.fire[0], m.fire[1] - 8, 150);
+      g.addColorStop(0, `rgba(255, 150, 60, ${fl})`);
+      g.addColorStop(1, 'rgba(255, 120, 40, 0)');
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = g; ctx.fillRect(0, 0, m.w, m.h);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    // target marker
+    if (S.target && !S.dialog) {
+      const t = S.target, bob = Math.floor(S.time * 4) % 2;
+      const x = Math.round(t.ax), y = Math.round(t.ay) - bob;
+      ctx.fillStyle = '#1c141e'; ctx.fillRect(x - 4, y - 4, 9, 2); ctx.fillRect(x - 3, y - 2, 7, 2); ctx.fillRect(x - 2, y, 5, 2); ctx.fillRect(x - 1, y + 2, 3, 1);
+      ctx.fillStyle = '#f4cc5c'; ctx.fillRect(x - 3, y - 3, 7, 1); ctx.fillRect(x - 2, y - 2, 5, 2); ctx.fillRect(x - 1, y, 3, 1); ctx.fillRect(x, y + 1, 1, 1);
+    }
+  }
+
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (S.ready) update(dt);
+    render();
+    requestAnimationFrame(loop);
+  }
+  function start(snap) {
+    load(snap || {}).catch((e) => { const el = $('err'); el.hidden = false; el.textContent = e.message + '. Reload the page to try again.'; });
+    requestAnimationFrame(loop);
+  }
+  window.claude?.hot?.snapshot?.(() => ({ map: S.map, x: S.p.x, y: S.p.y, dir: S.p.dir, pence: S.pence, ale: S.ale, quest: S.quest }));
+  window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
+</body>
+</html>
