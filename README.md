@@ -30,8 +30,10 @@ Then open <http://localhost:8000>.
 - **The crossroads:** the Plough & Harrow tavern, with smoking chimneys, a stable with horses, and a signpost.
 - **Inside the tavern:** order an ale from Mr. Hale, sit with the neighbors, and listen to the gossip.
 - **The wheat mystery:** the first quest, about wheat rust and the barberry hedge.
+- **What's under the log:** available from the start. Ranger digs up a stone point under the old log east of the barn. Jonah, a grinding stone at Heron Pond and Widow Abbot tell some of the history of Musketaquid, the Native name for Concord.
 - **Liberty tea:** once the wheat mystery is solved, Hannah asks you to gather herbs at Heron Pond for a tea that boycotts the King's.
-- **Quest markers:** a small gold "!" marks where a quest can be started: first the wheat, then Hannah once the wheat mystery is done.
+- **Quest markers:** a small gold "!" marks where a quest can be started: the wheat and the old log from the start, then Hannah once the wheat mystery is done.
+- **Task box:** lists every task under way; a finished task shows as complete for a few seconds, then drops off.
 - **Historical notes:** looking at things, and some conversations, add a short note about colonial life.
 - **Sound:** all synthesized in the browser with the Web Audio API: the creek, birds, wind in the forest, chickens, the ox, the tavern fire and chatter, and footsteps.
 
@@ -58,7 +60,8 @@ All dialogue lives near the top of the script in `index.html`:
 
 - `TALK` holds what each person says and the descriptions of things you can look at.
 - `NOTES` holds the historical notes.
-- `SPECIAL` and `QUEST` hold the wheat mystery quest. `SPECIAL` also holds the liberty tea quest, with `HERBS`, `teaTask` and `setTea` next to it.
+- `SPECIAL` and `QUEST` hold the wheat mystery quest. `SPECIAL` also holds the liberty tea quest (`HERBS`, `teaTask`, `setTea`) and the log quest (`DIG`, `setDig`).
+- `showTasks` draws the task box; add a new quest to its list.
 - `questStarts` decides where the "!" markers appear.
 
 ## Rebuilding the art

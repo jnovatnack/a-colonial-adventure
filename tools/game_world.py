@@ -93,6 +93,12 @@ def pond_dressing(wd, pond, meadow, trail):
     for (x, y) in ((150, 418), (64, 386)):
         wd.add(P.rock(1), x - 5, y - 4, box=(1, 2, 10, 7))
     wd.add(S2.log(), 62, 446, box=(0, 1, 26, 7))
+    # the old grinding stone from a Native fishing camp ("What's Under the Log")
+    ms = S2.mortar_stone()
+    mx, my = 26, 424
+    sc.foot_shadow(mx + ms.shape[1] // 2 + 1, my + ms.shape[0] - 1, ms.shape[1] * 0.5, 2)
+    wd.add(ms, mx, my, box=(1, 2, ms.shape[1] - 1, ms.shape[0] - 1))
+    wd.act([mx - 3, my - 6, mx + ms.shape[1] + 3, my + ms.shape[0] + 6], 'camp_stone', 'LOOK')
     # one look over the whole pond, added after the herbs so their acts win
     ys, xs = np.nonzero(pond)
     wd.act([xs.min() - 2, ys.min() - 2, xs.max() + 3, ys.max() + 3], 'pond', 'LOOK')
@@ -228,7 +234,7 @@ def outdoor():
     wd.add(S2.log(), 200, 484, box=(0, 1, 26, 7))
     for (x, y) in ((214, 244), (204, 420), (204, 566), (322, 270), (318, 420)):
         wd.add(P.rock(2), x, y, box=(0, 3, 14, 9))
-    wd.act([190, 292, 228, 310], 'log', 'LOOK')
+    wd.act([190, 292, 228, 310], 'forest_log', 'LOOK')
 
     # ---- TAVERN at the crossroads
     roof_dk = ((132, 112, 100), (100, 82, 74), (72, 58, 54), (48, 38, 38))
@@ -311,6 +317,11 @@ def outdoor():
     bdoor = bxx + 1 + 38 + 12
     bb = byy + barn.shape[0]
     wd.act([bdoor - 14, bb - 12, bdoor + 14, bb + 2], 'barn_door', 'LOOK')
+    # the old log east of the barn that Ranger digs under ("What's Under the Log")
+    lx, ly = 452, 472 + DY
+    sc.foot_shadow(lx + 13, ly + 6, 14, 2)
+    wd.add(S2.log(), lx, ly, box=(0, 1, 26, 7))
+    wd.act([lx - 6, ly - 8, lx + 32, ly + 14], 'log', 'LOOK')
 
     coop = make_house(30, 12, 10, roof_br, weath, TRIM, ((90, 64, 44), (70, 48, 34), (50, 34, 26)), door_x=11)
     wd.add(coop, 452, 494 + DY, box=(0, 8, coop.shape[1], coop.shape[0] - 1))

@@ -405,3 +405,17 @@ def cattails():
         ".l.ll..l.",
     ], {'C': ((150, 100, 64), (118, 76, 50), (84, 54, 40)), 'c': ((176, 160, 112),),
         'l': ((132, 176, 92), (92, 140, 72), (56, 100, 58))})
+
+
+def mortar_stone():
+    """A flat boulder with a hollow worn into it by generations of grinding corn."""
+    return rs([
+        "...SSSSSSSSSS...",
+        ".SSSSSSSSSSSSSS.",
+        "SSSSShhhhhhSSSSS",
+        "SSSShhwwhhhhSSSS",
+        "SSSSShhhhhhSSSSS",
+        "SSSSSSSSSSSSSSSS",
+        ".SSSSSSSSSSSSSS.",
+        "...SSSSSSSSSS...",
+    ], {'S': ((196, 190, 180), (156, 150, 146), (108, 104, 108)), 'h': ((76, 70, 78),), 'w': ((150, 190, 220),)})

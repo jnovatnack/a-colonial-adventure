@@ -33,6 +33,8 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
   border-color: var(--gold); transition: opacity 0.6s;
 }
 #quest small { margin-bottom: 2px; }
+#quest .task + .task { margin-top: 7px; padding-top: 7px; border-top: 1px dashed rgba(244, 204, 92, 0.45); }
+#quest .task.done { color: var(--muted); }
 #quest.fade, body.talking #quest { opacity: 0; }
 #purse { top: calc(env(safe-area-inset-top, 0px) + 14px); right: max(16px, env(safe-area-inset-right, 0px)); text-align: right; }
 #toast {
@@ -104,7 +106,7 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
 
 <div id="stage"><canvas id="c" aria-label="Top-down view of the game world"></canvas></div>
 <div class="hud chip" id="place">MIDDLESEX COUNTY<small>LATE SUMMER, 1774</small></div>
-<div class="hud chip" id="quest" hidden><small id="qlabel">TASK</small><span id="qtext"></span></div>
+<div class="hud chip" id="quest" hidden></div>
 <div class="hud chip" id="purse">PURSE<small id="coins">2s 6d</small></div>
 <div class="hud" id="toast"></div>
 <div class="hud chip off" id="hint"></div>
@@ -135,6 +137,7 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
       ['The beans want picking before the frost comes. Off to the tavern, are you?'],
       ['Mind you are home by dark. The wood path is no place to be at night.'],
       ['If you see Widow Abbot, tell her I have a jar of plum preserves set by for her.'],
+      ['That dog has been digging under the old log past the barn all week. Whatever is he after?'],
     ] },
     dog: { name: null, lines: [
       ['Ranger thumps his tail against the dirt and leans into your hand.'],
@@ -153,9 +156,10 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
     flax: { name: null, lines: [['Flax in blue flower. Come winter, Hannah will spin it into linen.']] },
     pumpkins: { name: null, lines: [['Pumpkins and squash, fattening on the vine.']] },
     creek: { name: null, lines: [['The creek runs quick and cold over the stones.']] },
-    log: { name: null, lines: [['A fallen oak, soft with moss. Something has been digging beneath it.']] },
+    forest_log: { name: null, lines: [['A fallen oak, soft with moss. A red squirrel scolds you from the far end.']] },
     pond: { name: null, lines: [['A still pond ringed with cattails. A heron lifts off the far bank and flaps away over the trees.'],
       ['Dragonflies skim the lily pads. Something plops into the water by the reeds.']] },
+    camp_stone: { name: null, lines: [['A big flat stone at the water\'s edge, with a smooth round hollow in its top full of rainwater.']] },
     herb_loosestrife: { name: null, lines: [['Slender stalks with leaves in fours, dotted with little yellow star flowers.']] },
     herb_mint: { name: null, lines: [['Wild mint grows thick in the wet ground. It smells sharp and clean when you brush it.']] },
     herb_raspberry: { name: null, lines: [['A raspberry bramble. The berries are long gone, but the leaves are thick and green.']] },
@@ -221,6 +225,11 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
     mint: 'Wild mint grows in damp ground across North America. Native peoples used it in medicines and teas, and colonists brewed it too, especially once drinking imported tea became unpatriotic.',
     raspberry: 'Dried raspberry leaves made one of the most popular tea substitutes, and they had long been used as a home remedy.',
     liberty_tea: 'The tea boycott gave women a central part in the resistance, since they ran the household and decided what was served. In October 1774 the Continental Congress went further, banning imports of British goods, tea included, from that December.',
+    stone_point: 'Native people made stone points like this by chipping flint, quartz and other hard stone. The oldest found in Massachusetts are more than 10,000 years old. Most tipped spears and darts; the bow and arrow came into use here much later, only about a thousand years before the English arrived.',
+    musketaquid: 'Musketaquid, usually translated as "grassy-banked river," was the Native name for the Concord area. Its people fished the spring runs of shad and alewives in the rivers and grew corn, beans and squash on the river meadows.',
+    mortar: 'Native women ground dried corn into meal in mortars of stone or hollowed wood, pounding it with a long pestle. The English learned to cook the meal into a porridge they called "samp," a name borrowed from a Native word.',
+    concord_purchase: 'Between 1616 and 1619, diseases carried by European traders killed most of the Native people of coastal New England. When English settlers came to Musketaquid in 1635, they bought the land from survivors, including the leaders Squaw Sachem and Tahattawan. Tradition says the town was named Concord for that peaceful agreement.',
+    deer_island: 'During King Philip\'s War (1675\u201376), the colony forced hundreds of Christian Native people onto Deer Island in Boston Harbor, among them Nashoba families who had been sheltering in Concord. Many died of cold and hunger that winter. Native communities endured in Massachusetts, and in 1775 men from places like Natick and Stockbridge joined the patriot army.',
     keeper: 'Taverns were the heart of colonial public life. Neighbors read newspapers aloud there, held meetings, and argued politics. Many revolutionary committees met over a mug of ale.',
   };
   const note = (text) => ['HISTORICAL NOTE', text, 'note'];
@@ -495,7 +504,7 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
     p: { x: 0, y: 0, dir: 'down', frame: 0, anim: 0, moving: false, seat: null },
     dog: { x: 0, y: 0, dir: 'down', frame: 0, anim: 0, waiting: null, stuck: 0 },
     trail: [], keys: new Set(), stick: null, chickens: [], puffs: [], smokeT: 0,
-    pence: 30, ale: 0, emptyMug: false, talkIdx: {}, quest: 0, holtNag: false, tea: 0, herbs: [], jonahHint: false,
+    pence: 30, ale: 0, emptyMug: false, talkIdx: {}, quest: 0, holtNag: false, tea: 0, herbs: [], jonahHint: false, dig: 0, doneAt: {},
     dialog: null, fade: 0, fadeDir: 0, pending: null, target: null,
     region: '', toastT: 0, scale: 2, view: [320, 200], time: 0,
   };
@@ -538,8 +547,10 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
     const st = (snap && snap.map) ? snap : W.start;
     S.map = st.map; S.p.x = st.x; S.p.y = st.y; S.p.dir = st.dir || 'down';
     if (snap && typeof snap.pence === 'number') { S.pence = snap.pence; S.ale = snap.ale || 0; }
-    setQuest((snap && snap.quest) || 0, false);
-    if (snap && snap.tea) { S.herbs = snap.herbs || []; setTea(snap.tea, false); }
+    S.quest = (snap && snap.quest) || 0;
+    if (snap && snap.tea) { S.tea = snap.tea; S.herbs = snap.herbs || []; }
+    if (snap && snap.dig) S.dig = snap.dig;
+    showTasks();
     S.dog.x = S.p.x + 14; S.dog.y = S.p.y + 2;
     if (S.map !== 'outdoor') { const d = S.maps.tavern.doors[0].spawn; S.dog.waiting = [d[0] + 14, d[1] + 4]; S.dog.x = S.dog.waiting[0]; S.dog.y = S.dog.waiting[1]; }
     const snd = W.maps.outdoor.sound;
@@ -720,21 +731,36 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
     'Ezra blames the barberry hedge. Go home and tell Hannah.',
     'The barberry hedge comes out before spring planting.',
   ];
-  // The task box shows one task at a time; a finished task fades out after a few seconds.
-  function showTask(text, done, announce) {
-    const q = $('quest');
-    if (!text) { q.hidden = true; return; }
+  // The task box lists every task under way. A finished task stays a few seconds, marked complete, then drops off.
+  const TASK_DONE_SECS = 7;
+  function showTasks() {
+    const q = $('quest'), now = performance.now(), items = [];
+    for (const t of [
+      { key: 'quest', text: QUEST[S.quest], done: S.quest === 3 },
+      { key: 'dig', text: digTask(), done: S.dig === 4 },
+      { key: 'tea', text: teaTask(), done: S.tea === 3 },
+    ]) {
+      if (!t.text || (t.done && !(now - (S.doneAt[t.key] || -1e9) < TASK_DONE_SECS * 1000))) continue;
+      items.push(t);
+    }
+    if (!items.length) { q.classList.add('fade'); return; }
     q.hidden = false; q.classList.remove('fade');
-    $('qlabel').textContent = done ? 'TASK COMPLETE' : 'TASK';
-    $('qtext').textContent = text;
-    if (announce) toast(announce);
-    clearTimeout(showTask.t);
-    if (done) showTask.t = setTimeout(() => q.classList.add('fade'), 7000);
+    q.replaceChildren(...items.map((t) => {
+      const d = document.createElement('div'), sm = document.createElement('small');
+      d.className = 'task' + (t.done ? ' done' : '');
+      sm.textContent = t.done ? 'TASK COMPLETE' : 'TASK';
+      d.append(sm, t.text);
+      return d;
+    }));
   }
-  function setQuest(stage, announce = true) {
-    S.quest = stage;
-    showTask(QUEST[stage], stage === 3, announce && (stage === 3 ? 'TASK COMPLETE' : 'NEW TASK'));
+  // Every task's stage setter goes through here: it records the stage, announces it and redraws the task box.
+  function advanceTask(key, stage, last, announce) {
+    S[key] = stage;
+    if (stage === last) { S.doneAt[key] = performance.now(); setTimeout(showTasks, TASK_DONE_SECS * 1000 + 50); }
+    if (announce) toast(announce === true ? (stage === last ? 'TASK COMPLETE' : 'NEW TASK') : announce);
+    showTasks();
   }
+  function setQuest(stage, announce = true) { advanceTask('quest', stage, 3, announce); }
   // ------------------------------------------------------------------ liberty tea
   // Stage 0: not offered (Hannah offers it once the wheat mystery is solved). 1: gather the three herbs at Heron Pond.
   // 2: all gathered, take them home. 3: Hannah has her tea, task done.
@@ -746,17 +772,24 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
     }
     return [null, null, 'Bring the herbs home to Hannah.', 'Hannah has her liberty tea for Thursday.'][S.tea];
   }
-  function setTea(stage, announce = true) {
-    S.tea = stage;
-    showTask(teaTask(), stage === 3, announce && (stage === 3 ? 'TASK COMPLETE' : 'NEW TASK'));
-  }
+  function setTea(stage, announce = true) { advanceTask('tea', stage, 3, announce); }
+  // ------------------------------------------------------------------ what's under the log
+  // Stage 0: not started (offered at the log east of the barn from the start). 1: Ranger digs up a stone point; ask at the tavern.
+  // 2: Jonah sends you to search Heron Pond. 3: you find the grinding stone; tell Widow Abbot. 4: task done.
+  const DIG = [null,
+    'Show the stone point to someone at the Plough & Harrow who knows the woods.',
+    'Search the shore of Heron Pond for signs of the old Native camp.',
+    'Tell Widow Abbot at the Plough & Harrow what you found.',
+    'You learned some of the story of Musketaquid.'];
+  const digTask = () => DIG[S.dig];
+  function setDig(stage, announce = true) { advanceTask('dig', stage, 4, announce); }
   function pickHerb(kind, lines) {
     if (S.tea !== 1 || S.herbs.includes(kind)) return null;
     return { lines, then: () => {
       S.herbs.push(kind);
       AUD.play('step', 'grass');
       if (S.herbs.length === 3) setTea(2);
-      else showTask(teaTask(), false, HERBS[kind].toUpperCase() + ' ' + S.herbs.length + '/3');
+      else advanceTask('tea', 1, 3, HERBS[kind].toUpperCase() + ' ' + S.herbs.length + '/3');
     } };
   }
   function questStarts() {
@@ -765,6 +798,7 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
     if (S.map !== 'outdoor') return out;
     if (S.quest === 0) { const a = M().acts.find((q) => q.id === 'wheat'); if (a) out.push({ id: 'wheat', x: a.r[0] + 34, y: a.r[1] + 18 }); }
     if (S.quest === 3 && S.tea === 0) { const n = M().npcs.find((q) => q.id === 'wife'); if (n) out.push({ id: 'wife', x: n.x, y: n.y - 28 }); }
+    if (S.dig === 0) { const a = M().acts.find((q) => q.id === 'log'); if (a) out.push({ id: 'log', x: (a.r[0] + a.r[2]) / 2, y: a.r[1] - 2 }); }
     return out;
   }
   const SPECIAL = {
@@ -821,7 +855,45 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
     herb_raspberry() {
       return pickHerb('raspberry', [[null, 'You reach carefully past the thorns and strip a handful of raspberry leaves. Only one scratch.'], note(NOTES.raspberry)]);
     },
+    log() {
+      if (S.dig === 0) {
+        AUD.play('bark', 0);
+        return { lines: [[null, 'Ranger pushes past you, sniffs at the hollow under the log, and starts digging. Dirt flies everywhere.'],
+          ['YOU', 'What have you got there, boy?'],
+          [null, 'In the loose earth lies a grey stone the length of your thumb, chipped on both sides to a sharp point. It is far too neat to be an accident.'],
+          ['YOU', 'Somebody made this, a long while ago. Jonah knows these woods. He might know what it is.']], then: () => setDig(1) };
+      }
+      return { lines: [[null, 'A mossy old log with a fresh hole dug under it. Ranger looks very pleased with himself.']] };
+    },
+    camp_stone() {
+      if (S.dig < 2) return null;
+      if (S.dig === 2) {
+        return { lines: [[null, 'You pull back the grass. The hollow in the top of the stone is smooth as a bowl, worn down by hand, not by water.'],
+          ['YOU', 'That\'s a grinding stone. Someone pounded corn here, year after year, long before there was a Concord.'],
+          note(NOTES.mortar)], then: () => setDig(3) };
+      }
+      return { lines: [[null, 'The old grinding stone sits where it has sat for who knows how many years.']] };
+    },
+    widow() {
+      if (S.dig !== 3) return null;
+      return { lines: [['YOU', 'Mrs. Abbot, Ranger dug up an Indian point under a log, and there\'s an old grinding stone down at Heron Pond.'],
+        ['WIDOW ABBOT', 'Is there, now. When the first English came here in \'35 they bought this land from the sachems. Squaw Sachem and Tahattawan, my mother said.'],
+        ['WIDOW ABBOT', 'There were few enough of their people left by then. A sickness had gone through before the English ever settled.'],
+        note(NOTES.concord_purchase),
+        ['WIDOW ABBOT', 'My grandmother was a girl here in King Philip\'s War. She remembered the Nashoba families, praying Indians, brought to Concord for their safety.'],
+        ['WIDOW ABBOT', 'Then soldiers came and marched them off to Deer Island, in Boston Harbor. A great many died there that winter. She never forgot it.'],
+        ['YOU', 'I\'ll keep the point safe. Somebody ought to remember whose land this was.'],
+        note(NOTES.deer_island)], then: () => setDig(4) };
+    },
     trapper() {
+      if (S.dig === 1) {
+        return { lines: [['YOU', 'Jonah, Ranger dug this up from under the old log past the barn. What do you make of it?'],
+          ['JONAH, A TRAPPER', 'Let\'s see. Aye, that\'s a point, Indian-made, chipped out of stone. Could be older than anything in the burying ground. Far older.'],
+          ['JONAH, A TRAPPER', 'This valley was theirs long before the English came. They called the river Musketaquid.'],
+          note(NOTES.stone_point),
+          ['JONAH, A TRAPPER', 'My father said they used to camp by Heron Pond for the fishing. Look along the shore, west side. Sometimes their stones are still lying where they left them.'],
+          note(NOTES.musketaquid)], then: () => setDig(2) };
+      }
       if (S.tea !== 1 || S.jonahHint) return null;
       S.jonahHint = true;
       return { lines: [['YOU', 'Jonah, Hannah\'s sent me for tea herbs. Loosestrife, mint and raspberry. She says you know Heron Pond.'],
@@ -1199,7 +1271,7 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
     load(snap || {}).catch((e) => { const el = $('err'); el.hidden = false; el.textContent = e.message + '. Reload the page to try again.'; });
     requestAnimationFrame(loop);
   }
-  window.claude?.hot?.snapshot?.(() => ({ map: S.map, x: S.p.x, y: S.p.y, dir: S.p.dir, pence: S.pence, ale: S.ale, quest: S.quest, tea: S.tea, herbs: S.herbs }));
+  window.claude?.hot?.snapshot?.(() => ({ map: S.map, x: S.p.x, y: S.p.y, dir: S.p.dir, pence: S.pence, ale: S.ale, quest: S.quest, tea: S.tea, herbs: S.herbs, dig: S.dig }));
   window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
 })();
 </script>
