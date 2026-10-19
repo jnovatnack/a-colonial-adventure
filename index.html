@@ -118,7 +118,7 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
 <div id="title">
   <div class="card">
     <div class="eyebrow">CHAPTER ONE &middot; LATE SUMMER, 1774</div>
-    <h1>Concord, 1775</h1>
+    <h1>Concord, 1774</h1>
     <p>Your farm sits at the edge of the wood. Past the creek, at the crossroads, the tavern fire is lit.</p>
     <button id="start" type="button">PRESS START</button>
     <div class="keys" id="keys">ARROWS OR WASD TO WALK &middot; SHIFT TO RUN<br>E OR SPACE TO TALK, LOOK AND SIT<br>M TO MUTE &middot; BEST WITH HEADPHONES</div>
@@ -152,15 +152,15 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
     woodpile: { name: null, lines: [['A good stack of split oak. Winter will want twice as much.']] },
     garden: { name: null, lines: [['Hannah\'s kitchen garden. Cabbages, squash and a row of beans.']] },
     corn: { name: null, lines: [['Indian corn, nearly as tall as you. The ears are filling out nicely.']] },
-    wheat: { name: null, lines: [['Winter wheat, gold and ready for the sickle.']] },
-    flax: { name: null, lines: [['Flax in blue flower. Come winter, Hannah will spin it into linen.']] },
+    wheat: { name: null, lines: [['Winter wheat, weeks past reaping time and still standing in the field.']] },
+    flax: { name: null, lines: [['Most of the flax is pulled and laid in rows to ret in the dew. A few late stalks still show blue flowers. Come winter, Hannah will spin it into linen.']] },
     pumpkins: { name: null, lines: [['Pumpkins and squash, fattening on the vine.']] },
     creek: { name: null, lines: [['The creek runs quick and cold over the stones.']] },
     forest_log: { name: null, lines: [['A fallen oak, soft with moss. A red squirrel scolds you from the far end.']] },
     pond: { name: null, lines: [['A still pond ringed with cattails. A heron lifts off the far bank and flaps away over the trees.'],
       ['Dragonflies skim the lily pads. Something plops into the water by the reeds.']] },
     camp_stone: { name: null, lines: [['A big flat stone at the water\'s edge, with a smooth round hollow in its top full of rainwater.']] },
-    herb_loosestrife: { name: null, lines: [['Slender stalks with leaves in fours, dotted with little yellow star flowers.']] },
+    herb_loosestrife: { name: null, lines: [['Slender stalks with leaves in fours. The little yellow flowers of early summer have gone to seed.']] },
     herb_mint: { name: null, lines: [['Wild mint grows thick in the wet ground. It smells sharp and clean when you brush it.']] },
     herb_raspberry: { name: null, lines: [['A raspberry bramble. The berries are long gone, but the leaves are thick and green.']] },
     signpost: { name: null, lines: [['West: Concord, 4 miles. East: the Boston road.']] },
@@ -804,7 +804,7 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
   const SPECIAL = {
     wheat() {
       if (S.quest === 0) {
-        return { lines: [[null, 'Your winter wheat should stand heavy and gold by now. Instead the stalks are streaked with rusty orange, and the heads are thin and shriveled.'],
+        return { lines: [[null, 'Your winter wheat should have been reaped weeks ago, but you have put off cutting it. The stalks are streaked with rusty orange, and the heads are thin and shriveled.'],
           ['YOU', 'Third year running. Father never had this trouble. What in heaven is wrong with it?']], then: () => setQuest(1) };
       }
       if (S.quest === 1) return { lines: [[null, 'The rust is worst along the west edge of the field, by the hedge, and thins out toward the east.'], ['YOU', 'Someone at the Plough & Harrow might know what ails it.']] };
@@ -847,7 +847,7 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
       return null;
     },
     herb_loosestrife() {
-      return pickHerb('loosestrife', [[null, 'You snap off a good bundle of loosestrife stalks, leaves and little yellow flowers and all.'], note(NOTES.loosestrife)]);
+      return pickHerb('loosestrife', [[null, 'You snap off a good bundle of loosestrife stalks, leaves and seed heads and all.'], note(NOTES.loosestrife)]);
     },
     herb_mint() {
       return pickHerb('mint', [[null, 'You kneel in the soft mud and pick a fistful of wild mint. Your fingers smell of it for an hour.'], note(NOTES.mint)]);
@@ -877,7 +877,7 @@ canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; 
     widow() {
       if (S.dig !== 3) return null;
       return { lines: [['YOU', 'Mrs. Abbot, Ranger dug up an Indian point under a log, and there\'s an old grinding stone down at Heron Pond.'],
-        ['WIDOW ABBOT', 'Is there, now. When the first English came here in \'35 they bought this land from the sachems. Squaw Sachem and Tahattawan, my mother said.'],
+        ['WIDOW ABBOT', 'Is there, now. When the first English came here, near a hundred and forty years back, they bought this land from the sachems. Squaw Sachem and Tahattawan, my mother said.'],
         ['WIDOW ABBOT', 'There were few enough of their people left by then. A sickness had gone through before the English ever settled.'],
         note(NOTES.concord_purchase),
         ['WIDOW ABBOT', 'My grandmother was a girl here in King Philip\'s War. She remembered the Nashoba families, praying Indians, brought to Concord for their safety.'],
